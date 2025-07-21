@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Hash, User, MessageCircle, Heart, Repeat2, Reply, Bot, Zap } from "lucide-react";
+import { Search, Hash, User, MessageCircle, Heart, Repeat2, Reply, Bot, Zap, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -32,9 +32,14 @@ interface TwitterAutomation {
   search_query: string;
   search_type: 'keywords' | 'hashtags' | 'users';
   action_type: 'reply' | 'post';
-  response_template: string;
+  ai_prompt: string;
+  strategy_context: string;
+  content_pillars: string;
+  brand_voice: string;
+  current_campaigns: string;
   is_active: boolean;
   frequency_minutes: number;
+  approved_replies: string[];
   created_at?: string;
 }
 
@@ -52,10 +57,18 @@ export function TwitterSearchDialog() {
     search_query: "",
     search_type: "keywords",
     action_type: "reply",
-    response_template: "",
+    ai_prompt: "",
+    strategy_context: "",
+    content_pillars: "",
+    brand_voice: "",
+    current_campaigns: "",
     is_active: true,
-    frequency_minutes: 60
+    frequency_minutes: 60,
+    approved_replies: []
   });
+  const [generatingReplies, setGeneratingReplies] = useState(false);
+  const [suggestedReplies, setSuggestedReplies] = useState<string[]>([]);
+  const [selectedReplies, setSelectedReplies] = useState<string[]>([]);
 
   const handleSearch = async (type: 'keywords' | 'hashtags' | 'users') => {
     if (!searchQuery.trim()) {
@@ -127,10 +140,19 @@ export function TwitterSearchDialog() {
   };
 
   const handleCreateAutomation = async () => {
-    if (!newAutomation.name || !newAutomation.search_query || !newAutomation.response_template) {
+    if (!newAutomation.name || !newAutomation.search_query || !newAutomation.ai_prompt) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedReplies.length === 0) {
+      toast({
+        title: "Error", 
+        description: "Please generate and approve at least one reply template",
         variant: "destructive",
       });
       return;
@@ -140,6 +162,7 @@ export function TwitterSearchDialog() {
       // In real implementation, save to database
       const automation: TwitterAutomation = {
         ...newAutomation,
+        approved_replies: selectedReplies,
         id: Date.now().toString(),
         created_at: new Date().toISOString()
       };
@@ -150,10 +173,17 @@ export function TwitterSearchDialog() {
         search_query: "",
         search_type: "keywords",
         action_type: "reply",
-        response_template: "",
+        ai_prompt: "",
+        strategy_context: "",
+        content_pillars: "",
+        brand_voice: "",
+        current_campaigns: "",
         is_active: true,
-        frequency_minutes: 60
+        frequency_minutes: 60,
+        approved_replies: []
       });
+      setSuggestedReplies([]);
+      setSelectedReplies([]);
 
       toast({
         title: "Automation Created",
@@ -173,6 +203,60 @@ export function TwitterSearchDialog() {
       prev.map(auto => 
         auto.id === id ? { ...auto, is_active: !auto.is_active } : auto
       )
+    );
+  };
+
+  const generateAIReplies = async () => {
+    if (!newAutomation.ai_prompt || !newAutomation.search_query) {
+      toast({
+        title: "Error",
+        description: "Please enter an AI prompt and search query first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGeneratingReplies(true);
+    try {
+      const response = await supabase.functions.invoke('generate-ai-replies', {
+        body: {
+          ai_prompt: newAutomation.ai_prompt,
+          search_query: newAutomation.search_query,
+          search_type: newAutomation.search_type,
+          strategy_context: newAutomation.strategy_context,
+          content_pillars: newAutomation.content_pillars,
+          brand_voice: newAutomation.brand_voice,
+          current_campaigns: newAutomation.current_campaigns,
+          action_type: newAutomation.action_type
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      setSuggestedReplies(response.data.replies);
+      toast({
+        title: "AI Replies Generated",
+        description: `Generated ${response.data.replies.length} reply suggestions`,
+      });
+    } catch (error) {
+      console.error('AI generation error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate AI replies. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingReplies(false);
+    }
+  };
+
+  const toggleReplySelection = (reply: string) => {
+    setSelectedReplies(prev => 
+      prev.includes(reply) 
+        ? prev.filter(r => r !== reply)
+        : [...prev, reply]
     );
   };
 
@@ -447,25 +531,122 @@ export function TwitterSearchDialog() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="response-template">Response Template</Label>
+              {/* Strategy Context Fields */}
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-medium">Strategy Context (for AI)</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="strategy-context">Overall Strategy</Label>
+                    <Textarea
+                      id="strategy-context"
+                      placeholder="Describe your overall social media strategy, goals, and messaging approach..."
+                      value={newAutomation.strategy_context}
+                      onChange={(e) => setNewAutomation(prev => ({ ...prev, strategy_context: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="content-pillars">Content Pillars</Label>
+                    <Textarea
+                      id="content-pillars"
+                      placeholder="List your key content themes and messaging pillars..."
+                      value={newAutomation.content_pillars}
+                      onChange={(e) => setNewAutomation(prev => ({ ...prev, content_pillars: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="brand-voice">Brand Voice & Tone</Label>
+                    <Textarea
+                      id="brand-voice"
+                      placeholder="Describe your brand voice, tone of voice, and communication style..."
+                      value={newAutomation.brand_voice}
+                      onChange={(e) => setNewAutomation(prev => ({ ...prev, brand_voice: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="current-campaigns">Current Campaigns</Label>
+                    <Textarea
+                      id="current-campaigns"
+                      placeholder="List current campaigns, promotions, or initiatives to consider..."
+                      value={newAutomation.current_campaigns}
+                      onChange={(e) => setNewAutomation(prev => ({ ...prev, current_campaigns: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Prompt Field */}
+              <div className="space-y-2 border-t pt-4">
+                <Label htmlFor="ai-prompt">AI Instructions & Context</Label>
                 <Textarea
-                  id="response-template"
+                  id="ai-prompt"
                   placeholder={newAutomation.action_type === 'reply' 
-                    ? "Write your reply template here. Use {username} and {content} placeholders."
-                    : "Write your post template here. Use {query} and {timestamp} placeholders."
+                    ? "Provide specific instructions for AI replies. Example: 'Generate helpful, engaging replies that showcase our expertise in crypto analysis. Keep replies under 280 characters, ask thoughtful questions, and always add value to the conversation.'"
+                    : "Provide specific instructions for AI posts. Example: 'Create engaging posts about the latest trends. Include relevant hashtags, keep it informative yet accessible, and encourage engagement.'"
                   }
-                  value={newAutomation.response_template}
-                  onChange={(e) => setNewAutomation(prev => ({ ...prev, response_template: e.target.value }))}
+                  value={newAutomation.ai_prompt}
+                  onChange={(e) => setNewAutomation(prev => ({ ...prev, ai_prompt: e.target.value }))}
                   rows={4}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {newAutomation.action_type === 'reply' 
-                    ? "Available placeholders: {username}, {content}, {query}"
-                    : "Available placeholders: {query}, {timestamp}, {date}"
-                  }
+                  This prompt will be used by AI to generate {newAutomation.action_type === 'reply' ? 'replies' : 'posts'} based on your strategy and the trending content found.
                 </p>
               </div>
+
+              {/* Generate AI Replies Button */}
+              <Button 
+                onClick={generateAIReplies} 
+                disabled={generatingReplies || !newAutomation.ai_prompt || !newAutomation.search_query}
+                className="w-full"
+                variant="secondary"
+              >
+                {generatingReplies ? "Generating AI Replies..." : "Generate AI Reply Suggestions"}
+              </Button>
+
+              {/* AI Generated Replies */}
+              {suggestedReplies.length > 0 && (
+                <div className="space-y-4 border-t pt-4">
+                  <h4 className="font-medium">AI Generated Replies - Select to Approve</h4>
+                  <div className="space-y-2">
+                    {suggestedReplies.map((reply, index) => (
+                      <Card 
+                        key={index} 
+                        className={`cursor-pointer transition-all ${
+                          selectedReplies.includes(reply) 
+                            ? 'border-primary bg-primary/5' 
+                            : 'border-border hover:border-border/80'
+                        }`}
+                        onClick={() => toggleReplySelection(reply)}
+                      >
+                        <CardContent className="pt-4">
+                          <div className="flex items-start justify-between">
+                            <p className="text-sm flex-1">{reply}</p>
+                            <div className="ml-2">
+                              {selectedReplies.includes(reply) ? (
+                                <Badge variant="default">Selected</Badge>
+                              ) : (
+                                <Badge variant="outline">Click to Select</Badge>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Selected: {selectedReplies.length} of {suggestedReplies.length} replies
+                  </p>
+                </div>
+              )}
 
               <div className="flex items-center space-x-2">
                 <Switch
@@ -476,8 +657,12 @@ export function TwitterSearchDialog() {
                 <Label htmlFor="automation-active">Start automation immediately</Label>
               </div>
 
-              <Button onClick={handleCreateAutomation} className="w-full">
-                Create Automation
+              <Button 
+                onClick={handleCreateAutomation} 
+                className="w-full"
+                disabled={selectedReplies.length === 0}
+              >
+                Create Automation ({selectedReplies.length} replies approved)
               </Button>
             </div>
           </TabsContent>
@@ -538,10 +723,23 @@ export function TwitterSearchDialog() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          <Label className="text-xs font-medium">Response Template:</Label>
+                          <Label className="text-xs font-medium">AI Prompt:</Label>
                           <p className="text-sm bg-muted p-2 rounded text-muted-foreground">
-                            {automation.response_template}
+                            {automation.ai_prompt}
                           </p>
+                          <Label className="text-xs font-medium">Approved Replies ({automation.approved_replies.length}):</Label>
+                          <div className="space-y-1">
+                            {automation.approved_replies.slice(0, 3).map((reply, index) => (
+                              <p key={index} className="text-xs bg-muted p-1 rounded text-muted-foreground">
+                                {reply}
+                              </p>
+                            ))}
+                            {automation.approved_replies.length > 3 && (
+                              <p className="text-xs text-muted-foreground">
+                                +{automation.approved_replies.length - 3} more replies...
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
