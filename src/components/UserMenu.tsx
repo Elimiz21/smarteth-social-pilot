@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { User, LogOut, Settings, Shield, Users } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,96 +9,77 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { LogOut, User, Settings } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock user data - will be replaced with real auth
-const mockUser = {
-  name: "Eli Cohen",
-  email: "eli@silvercl.com",
-  role: "Owner",
-  avatar: null,
-};
+export const UserMenu = () => {
+  const { user, profile } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-const getRoleBadgeVariant = (role: string) => {
-  switch (role) {
-    case "Owner":
-      return "default";
-    case "Marketer": 
-      return "secondary";
-    case "Analyst":
-      return "outline";
-    default:
-      return "outline";
-  }
-};
-
-export function UserMenu() {
-  const handleLogout = () => {
-    // TODO: Implement logout logic
-    console.log("Logging out...");
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out",
+      });
+      navigate("/auth");
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast({
+        title: "Error",
+        description: "Failed to sign out",
+        variant: "destructive",
+      });
+    }
   };
+
+  if (!user) return null;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar className="h-10 w-10">
-            <AvatarImage src={mockUser.avatar || ""} alt={mockUser.name} />
-            <AvatarFallback className="bg-gradient-primary text-primary-foreground">
-              {mockUser.name.split(" ").map(n => n[0]).join("")}
+            <AvatarFallback>
+              {profile?.full_name 
+                ? profile.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
+                : user.email?.[0].toUpperCase()
+              }
             </AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium leading-none">{mockUser.name}</p>
-              <Badge variant={getRoleBadgeVariant(mockUser.role)} className="text-xs">
-                {mockUser.role}
-              </Badge>
-            </div>
-            <p className="text-xs leading-none text-muted-foreground">
-              {mockUser.email}
+          <div className="flex flex-col space-y-1">
+            <p className="text-sm font-medium leading-none">
+              {profile?.full_name || "User"}
             </p>
+            <p className="text-xs leading-none text-muted-foreground">
+              {user.email}
+            </p>
+            {profile?.role && (
+              <p className="text-xs leading-none text-muted-foreground capitalize">
+                {profile.role}
+              </p>
+            )}
           </div>
         </DropdownMenuLabel>
-        
         <DropdownMenuSeparator />
-        
-        <DropdownMenuItem>
-          <User className="mr-2 h-4 w-4" />
-          <span>Profile</span>
-        </DropdownMenuItem>
-        
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/settings")}>
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
-        
-        {mockUser.role === "Owner" && (
-          <DropdownMenuItem>
-            <Users className="mr-2 h-4 w-4" />
-            <span>User Management</span>
-          </DropdownMenuItem>
-        )}
-        
-        <DropdownMenuItem>
-          <Shield className="mr-2 h-4 w-4" />
-          <span>Security</span>
-        </DropdownMenuItem>
-        
         <DropdownMenuSeparator />
-        
-        <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+        <DropdownMenuItem onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+};

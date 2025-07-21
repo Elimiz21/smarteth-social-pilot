@@ -1,205 +1,357 @@
-import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { 
-  Users, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Shield, 
-  UserCheck,
-  Settings,
-  Mail,
-  Calendar,
-  MoreVertical
-} from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-const mockUsers = [
-  {
-    id: 1,
-    name: "Eli Cohen",
-    email: "eli@silvercl.com",
-    role: "Owner",
-    status: "active",
-    lastLogin: "2024-01-15T10:30:00Z",
-    avatar: null,
-    permissions: ["all"]
-  },
-  {
-    id: 2,
-    name: "Sarah Marketing",
-    email: "sarah@silvercl.com", 
-    role: "Marketer",
-    status: "active",
-    lastLogin: "2024-01-15T09:15:00Z",
-    avatar: null,
-    permissions: ["content", "scheduling", "analytics"]
-  },
-  {
-    id: 3,
-    name: "David Analyst", 
-    email: "david@silvercl.com",
-    role: "Analyst",
-    status: "active",
-    lastLogin: "2024-01-14T16:45:00Z",
-    avatar: null,
-    permissions: ["analytics", "content_draft"]
-  }
-];
+import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, Shield, Trash2, Check, X, User, Mail, Calendar } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const rolePermissions = {
-  Owner: {
-    color: "default",
-    permissions: ["Full system access", "User management", "Integration settings", "Strategy editing", "Compliance settings", "GitHub export"]
+  "owner": {
+    color: "destructive" as const,
+    permissions: ["All Permissions"]
   },
-  Marketer: {
-    color: "secondary", 
-    permissions: ["Content generation", "Content editing", "Content approval", "Post scheduling", "Analytics viewing"]
+  "admin": {
+    color: "default" as const,
+    permissions: ["User Management", "Content Management", "Analytics", "Settings"]
   },
-  Analyst: {
-    color: "outline",
-    permissions: ["Content drafting", "Analytics viewing", "Report generation"]
+  "marketer": {
+    color: "default" as const,
+    permissions: ["Create Content", "Schedule Posts", "View Analytics", "Manage Campaigns"]
+  },
+  "analyst": {
+    color: "secondary" as const,
+    permissions: ["View Analytics", "Export Data", "Generate Reports"]
+  },
+  "content_creator": {
+    color: "outline" as const,
+    permissions: ["Create Content", "Upload Media", "Edit Posts"]
+  },
+  "user": {
+    color: "outline" as const,
+    permissions: ["View Content", "View Analytics (Read-only)"]
   }
 };
 
-export default function UserManagement() {
-  const [showAddUser, setShowAddUser] = useState(false);
+const UserManagement = () => {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { profile } = useAuth();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (profile?.role === 'owner') {
+      fetchUsers();
+    } else {
+      setLoading(false);
+    }
+  }, [profile]);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch users",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const approveUser = async (userId: string, userEmail: string, userName: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          status: 'approved',
+          approved_by: profile?.id,
+          approved_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Send confirmation email
+      await supabase.functions.invoke('send-confirmation-email', {
+        body: {
+          to: userEmail,
+          userEmail,
+          userName,
+          status: 'approved'
+        }
+      });
+
+      toast({
+        title: "User approved",
+        description: "User has been approved and notification sent",
+      });
+
+      fetchUsers();
+    } catch (error) {
+      console.error('Error approving user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to approve user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const rejectUser = async (userId: string, userEmail: string, userName: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: 'rejected' })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Send rejection email
+      await supabase.functions.invoke('send-confirmation-email', {
+        body: {
+          to: userEmail,
+          userEmail,
+          userName,
+          status: 'rejected'
+        }
+      });
+
+      toast({
+        title: "User rejected",
+        description: "User has been rejected and notification sent",
+      });
+
+      fetchUsers();
+    } catch (error) {
+      console.error('Error rejecting user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reject user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    try {
+      const { error } = await supabase.auth.admin.deleteUser(userId);
+
+      if (error) throw error;
+
+      toast({
+        title: "User deleted",
+        description: "User has been permanently deleted",
+      });
+
+      fetchUsers();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateUserRole = async (userId: string, newRole: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Role updated",
+        description: "User role has been updated successfully",
+      });
+
+      fetchUsers();
+    } catch (error) {
+      console.error('Error updating role:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update user role",
+        variant: "destructive",
+      });
+    }
+  };
 
   const getRoleBadgeVariant = (role: string): "default" | "destructive" | "outline" | "secondary" => {
-    const color = rolePermissions[role as keyof typeof rolePermissions]?.color;
-    if (color === "default" || color === "secondary" || color === "outline") {
-      return color;
-    }
-    return "outline";
+    const roleConfig = rolePermissions[role as keyof typeof rolePermissions];
+    return roleConfig?.color || "default";
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge className="bg-success text-success-foreground">Active</Badge>;
-      case "inactive":
-        return <Badge variant="outline">Inactive</Badge>;
-      case "pending":
-        return <Badge variant="secondary">Pending</Badge>;
-      default:
-        return <Badge variant="outline">Unknown</Badge>;
-    }
+    const variants = {
+      "approved": "default",
+      "pending": "secondary", 
+      "rejected": "outline"
+    } as const;
+    
+    return (
+      <Badge variant={variants[status as keyof typeof variants] || "default"}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    );
   };
 
   const formatLastLogin = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + " at " + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short', 
+      day: 'numeric'
+    });
   };
+
+  if (loading) {
+    return <div className="p-6">Loading...</div>;
+  }
+
+  if (profile?.role !== 'owner') {
+    return (
+      <div className="p-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
+          <p>Only the owner can access user management.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            User Management
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Manage team access and permissions for SmartEth marketing platform
+          <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
+          <p className="text-muted-foreground">
+            Manage team members and their permissions
           </p>
         </div>
-        <Button variant="hero" onClick={() => setShowAddUser(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add User
-        </Button>
       </div>
 
-      {/* User List */}
-      <div className="grid grid-cols-1 gap-6">
-        {mockUsers.map((user) => (
-          <Card key={user.id} className="hover:shadow-card-hover transition-all duration-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage src={user.avatar || ""} alt={user.name} />
-                    <AvatarFallback className="bg-gradient-primary text-primary-foreground">
-                      {user.name.split(" ").map(n => n[0]).join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-semibold text-lg">{user.name}</h3>
-                      <Badge variant={getRoleBadgeVariant(user.role)}>
-                        {user.role}
-                      </Badge>
-                      {getStatusBadge(user.status)}
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Mail className="w-3 h-3" />
-                        {user.email}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        Last login: {formatLastLogin(user.lastLogin)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm">
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {users.map((user) => (
+          <Card key={user.id} className="relative">
+            <CardHeader className="flex flex-row items-center space-y-0 pb-2">
+              <Avatar className="h-12 w-12">
+                <AvatarFallback>
+                  {user.full_name ? user.full_name.split(' ').map((n: string) => n[0]).join('') : user.email[0].toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="ml-4 space-y-1 flex-1">
+                <p className="text-sm font-medium leading-none">{user.full_name || 'No Name'}</p>
+                <p className="text-sm text-muted-foreground">{user.email}</p>
+              </div>
+              
+              {user.status === 'pending' ? (
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => approveUser(user.id, user.email, user.full_name || user.email)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Check className="h-4 w-4 text-green-600" />
                   </Button>
-                  
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
-                        <UserCheck className="w-4 h-4 mr-2" />
-                        View Profile
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Settings className="w-4 h-4 mr-2" />
-                        Permissions
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Remove User
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => rejectUser(user.id, user.email, user.full_name || user.email)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="h-4 w-4 text-red-600" />
+                  </Button>
+                </div>
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 p-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => updateUserRole(user.id, user.role === 'user' ? 'admin' : 'user')}>
+                      <Shield className="mr-2 h-4 w-4" />
+                      {user.role === 'user' ? 'Make Admin' : 'Make User'}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <DropdownMenuItem 
+                          className="text-destructive"
+                          onSelect={(e) => e.preventDefault()}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete User
+                        </DropdownMenuItem>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete User</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to permanently delete this user? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => deleteUser(user.id)}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center space-x-2 text-sm">
+                <Badge variant={getRoleBadgeVariant(user.role)}>
+                  {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                </Badge>
+                {getStatusBadge(user.status)}
+              </div>
+              
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <User className="h-4 w-4" />
+                  <span>Created: {formatLastLogin(user.created_at)}</span>
                 </div>
               </div>
 
-              {/* Permissions Summary */}
-              <div className="mt-4 pt-4 border-t border-border">
-                <div className="flex items-start gap-2">
-                  <Shield className="w-4 h-4 mt-1 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium mb-1">Permissions:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {rolePermissions[user.role as keyof typeof rolePermissions]?.permissions.map((permission) => (
-                        <Badge key={permission} variant="outline" className="text-xs">
-                          {permission}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
+              <div className="mt-4">
+                <p className="text-sm font-medium mb-2">Permissions:</p>
+                <div className="flex flex-wrap gap-1">
+                  {(rolePermissions[user.role as keyof typeof rolePermissions]?.permissions || []).slice(0, 2).map((permission: string, index: number) => (
+                    <Badge key={index} variant="outline" className="text-xs">
+                      {permission}
+                    </Badge>
+                  ))}
+                  {(rolePermissions[user.role as keyof typeof rolePermissions]?.permissions || []).length > 2 && (
+                    <Badge variant="outline" className="text-xs">
+                      +{(rolePermissions[user.role as keyof typeof rolePermissions]?.permissions || []).length - 2} more
+                    </Badge>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -207,85 +359,35 @@ export default function UserManagement() {
         ))}
       </div>
 
-      {/* Add User Form */}
-      {showAddUser && (
-        <Card className="border-accent/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="w-5 h-5" />
-              Add New User
-            </CardTitle>
-            <CardDescription>
-              Invite a new team member to the SmartEth marketing platform
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Full Name</Label>
-                <Input placeholder="Enter full name" />
-              </div>
-              <div className="space-y-2">
-                <Label>Email Address</Label>
-                <Input type="email" placeholder="user@silvercl.com" />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Role</Label>
-              <Select defaultValue="analyst">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="analyst">Analyst - View analytics and draft content</SelectItem>
-                  <SelectItem value="marketer">Marketer - Generate, edit, and schedule content</SelectItem>
-                  <SelectItem value="owner" disabled>Owner - Full access (Owner only)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <Button variant="hero">
-                <Mail className="w-4 h-4 mr-2" />
-                Send Invitation
-              </Button>
-              <Button variant="outline" onClick={() => setShowAddUser(false)}>
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Role Permissions Reference */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5" />
-            Role Permissions Reference
-          </CardTitle>
+          <CardTitle>Role Permissions Reference</CardTitle>
           <CardDescription>
-            Understanding access levels for each user role
+            Overview of what each role can access and do
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {Object.entries(rolePermissions).map(([role, config]) => (
-            <div key={role} className="p-4 border border-border rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant={config.color as "default" | "destructive" | "outline" | "secondary"}>{role}</Badge>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {Object.entries(rolePermissions).map(([role, config]) => (
+              <div key={role} className="space-y-2">
+                <Badge variant={config.color} className="mb-2">
+                  {role.charAt(0).toUpperCase() + role.slice(1)}
+                </Badge>
+                <ul className="text-sm space-y-1">
+                  {config.permissions.map((permission, index) => (
+                    <li key={index} className="text-muted-foreground">
+                      • {permission}
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {config.permissions.map((permission) => (
-                  <div key={permission} className="text-sm text-muted-foreground">
-                    • {permission}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>
   );
-}
+};
+
+export default UserManagement;
