@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ContentLibrary, type GeneratedContent } from "@/components/content/ContentLibrary";
+import { WeeklyContentPlanner, type WeeklyContentPlan } from "@/components/content/WeeklyContentPlanner";
 import { 
   Sparkles, 
   RefreshCw, 
@@ -16,7 +19,10 @@ import {
   MessageSquare,
   Image,
   BarChart3,
-  Settings
+  Settings,
+  Calendar,
+  Library,
+  Brain
 } from "lucide-react";
 
 const aiProviders = [
@@ -36,6 +42,78 @@ const contentTypes = [
 ];
 
 export default function ContentGeneration() {
+  const [generatedContents, setGeneratedContents] = useState<GeneratedContent[]>([
+    {
+      id: "1",
+      content: "🚀 SmartEth's regulated approach to ETH asset management continues to deliver exceptional results for institutional clients. Our cutting-edge DeFi integration provides the security and transparency modern investors demand. #SmartETH #InstitutionalCrypto #DeFi",
+      type: "tweet",
+      audience: "investors",
+      tone: "professional",
+      platforms: ["twitter", "linkedin"],
+      keywords: ["SmartETH", "DeFi", "institutional"],
+      engagementScore: 8.5,
+      createdAt: new Date(Date.now() - 86400000),
+      status: "approved",
+    },
+    {
+      id: "2", 
+      content: "The future of crypto asset management lies in regulation and innovation working together. SmartEth's Israeli regulatory framework provides the foundation for sustainable growth in the digital asset space.",
+      type: "linkedin",
+      audience: "investors",
+      tone: "authoritative", 
+      platforms: ["linkedin"],
+      keywords: ["regulation", "innovation", "digital assets"],
+      engagementScore: 9.2,
+      createdAt: new Date(Date.now() - 172800000),
+      status: "approved",
+    },
+  ]);
+
+  const [weeklyPlans, setWeeklyPlans] = useState<WeeklyContentPlan[]>([]);
+
+  const handleCreatePlan = (plan: Omit<WeeklyContentPlan, 'id'>) => {
+    const newPlan = { ...plan, id: Date.now().toString() };
+    setWeeklyPlans(prev => [...prev, newPlan]);
+  };
+
+  const handleExecutePlan = (planId: string) => {
+    // This would open the bulk scheduler - not used directly anymore
+    console.log("Executing plan:", planId);
+  };
+
+  const handleScheduleBulkItems = (items: any[]) => {
+    console.log("Scheduling bulk items:", items);
+    // Here you would integrate with the scheduling system
+    // For now, we'll add the generated content to the library
+    const newContents = items.map(item => ({
+      ...item.content,
+      status: "approved" as const
+    }));
+    setGeneratedContents(prev => [...prev, ...newContents]);
+  };
+
+  const handleEditPlan = (plan: WeeklyContentPlan) => {
+    console.log("Edit plan:", plan);
+  };
+
+  const handleSelectContent = (content: GeneratedContent) => {
+    console.log("Selected content:", content);
+  };
+
+  const handleEditContent = (content: GeneratedContent) => {
+    console.log("Edit content:", content);
+  };
+
+  const handleDeleteContent = (id: string) => {
+    setGeneratedContents(prev => prev.filter(c => c.id !== id));
+  };
+
+  const handleApproveContent = (id: string) => {
+    setGeneratedContents(prev => 
+      prev.map(c => c.id === id ? { ...c, status: "approved" as const } : c)
+    );
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -60,7 +138,24 @@ export default function ContentGeneration() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <Tabs defaultValue="generator" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="generator" className="flex items-center gap-2">
+            <Brain className="w-4 h-4" />
+            AI Generator
+          </TabsTrigger>
+          <TabsTrigger value="library" className="flex items-center gap-2">
+            <Library className="w-4 h-4" />
+            Content Library
+          </TabsTrigger>
+          <TabsTrigger value="planner" className="flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            Weekly Planner
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="generator">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Content Configuration */}
         <Card className="lg:col-span-1">
           <CardHeader>
@@ -303,7 +398,29 @@ export default function ContentGeneration() {
             </Tabs>
           </CardContent>
         </Card>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="library">
+          <ContentLibrary 
+            contents={generatedContents}
+            onSelectContent={handleSelectContent}
+            onEditContent={handleEditContent}
+            onDeleteContent={handleDeleteContent}
+            onApproveContent={handleApproveContent}
+          />
+        </TabsContent>
+
+        <TabsContent value="planner">
+          <WeeklyContentPlanner 
+            plans={weeklyPlans}
+            onCreatePlan={handleCreatePlan}
+            onExecutePlan={handleExecutePlan}
+            onEditPlan={handleEditPlan}
+            onScheduleBulkItems={handleScheduleBulkItems}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

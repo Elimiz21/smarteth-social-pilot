@@ -5,6 +5,7 @@ import { CreatePostDialog } from "@/components/scheduling/CreatePostDialog";
 import { ScheduledPostCard } from "@/components/scheduling/ScheduledPostCard";
 import { SchedulingCalendar } from "@/components/scheduling/SchedulingCalendar";
 import { Calendar, List, BarChart3 } from "lucide-react";
+import type { GeneratedContent } from "@/components/content/ContentLibrary";
 
 interface ScheduledPost {
   id: string;
@@ -16,6 +17,34 @@ interface ScheduledPost {
 }
 
 export default function Scheduling() {
+  // Mock data - in real app this would come from content generation
+  const availableContent: GeneratedContent[] = [
+    {
+      id: "content-1",
+      content: "🚀 SmartEth's regulated approach to ETH asset management continues to deliver exceptional results for institutional clients. Our cutting-edge DeFi integration provides the security and transparency modern investors demand. #SmartETH #InstitutionalCrypto #DeFi",
+      type: "tweet",
+      audience: "investors",
+      tone: "professional", 
+      platforms: ["twitter", "linkedin"],
+      keywords: ["SmartETH", "DeFi", "institutional"],
+      engagementScore: 8.5,
+      createdAt: new Date(Date.now() - 86400000),
+      status: "approved",
+    },
+    {
+      id: "content-2",
+      content: "The future of crypto asset management lies in regulation and innovation working together. SmartEth's Israeli regulatory framework provides the foundation for sustainable growth in the digital asset space.",
+      type: "linkedin",
+      audience: "investors", 
+      tone: "authoritative",
+      platforms: ["linkedin"],
+      keywords: ["regulation", "innovation", "digital assets"],
+      engagementScore: 9.2,
+      createdAt: new Date(Date.now() - 172800000),
+      status: "approved",
+    },
+  ];
+
   const [posts, setPosts] = useState<ScheduledPost[]>([
     {
       id: "1",
@@ -61,7 +90,10 @@ export default function Scheduling() {
             Manage and schedule your content across all platforms
           </p>
         </div>
-        <CreatePostDialog onCreatePost={handleCreatePost} />
+        <CreatePostDialog 
+          onCreatePost={handleCreatePost} 
+          availableContent={availableContent}
+        />
       </div>
 
       <Tabs defaultValue="calendar" className="space-y-6">
