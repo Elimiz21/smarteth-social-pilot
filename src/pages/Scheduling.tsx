@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreatePostDialog } from "@/components/scheduling/CreatePostDialog";
 import { ScheduledPostCard } from "@/components/scheduling/ScheduledPostCard";
 import { SchedulingCalendar } from "@/components/scheduling/SchedulingCalendar";
-import { Calendar, List, BarChart3 } from "lucide-react";
+import { Calendar, List, BarChart3, Search } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import type { GeneratedContent } from "@/components/content/ContentLibrary";
+import { TwitterSearchDialog } from "@/components/scheduling/TwitterSearchDialog";
 
 interface ScheduledPost {
   id: string;
@@ -17,6 +20,10 @@ interface ScheduledPost {
 }
 
 export default function Scheduling() {
+  const { toast } = useToast();
+  const [posts, setPosts] = useState<ScheduledPost[]>([]);
+  const [loading, setLoading] = useState(true);
+
   // Mock data - in real app this would come from content generation
   const availableContent: GeneratedContent[] = [
     {
@@ -45,25 +52,83 @@ export default function Scheduling() {
     },
   ];
 
-  const [posts, setPosts] = useState<ScheduledPost[]>([
-    {
-      id: "1",
-      content: "🚀 Exciting announcement coming tomorrow! Stay tuned for something amazing. #Innovation #TechNews",
-      scheduledTime: new Date(Date.now() + 86400000), // Tomorrow
-      platforms: ["twitter", "linkedin"],
-      status: "scheduled",
-    },
-    {
-      id: "2",
-      content: "Behind the scenes at our latest product development. The team is working hard to bring you the best experience possible!",
-      scheduledTime: new Date(Date.now() + 172800000), // Day after tomorrow
-      platforms: ["facebook", "instagram"],
-      status: "scheduled",
-    },
-  ]);
+  // Load scheduled posts from database
+  useEffect(() => {
+    loadScheduledPosts();
+  }, []);
 
-  const handleCreatePost = (newPost: ScheduledPost) => {
-    setPosts(prev => [...prev, newPost]);
+  const loadScheduledPosts = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('scheduled_posts')
+        .select('*')
+        .order('scheduled_time', { ascending: true });
+
+      if (error) throw error;
+
+      const formattedPosts: ScheduledPost[] = data?.map(post => ({
+        id: post.id,
+        content: post.content,
+        scheduledTime: new Date(post.scheduled_time),
+        platforms: post.platforms,
+        status: post.status as "scheduled" | "published" | "failed",
+        imageUrl: post.image_url || undefined,
+      })) || [];
+
+      setPosts(formattedPosts);
+    } catch (error) {
+      console.error('Error loading posts:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load scheduled posts",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreatePost = async (newPost: Omit<ScheduledPost, 'id'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('scheduled_posts')
+        .insert([{
+          content: newPost.content,
+          scheduled_time: newPost.scheduledTime.toISOString(),
+          platforms: newPost.platforms,
+          status: newPost.status,
+          image_url: newPost.imageUrl,
+          user_id: '00000000-0000-0000-0000-000000000000' // TODO: Replace with actual user ID
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const formattedPost: ScheduledPost = {
+          id: data.id,
+          content: data.content,
+          scheduledTime: new Date(data.scheduled_time),
+          platforms: data.platforms,
+          status: data.status as "scheduled" | "published" | "failed",
+          imageUrl: data.image_url || undefined,
+        };
+        setPosts(prev => [...prev, formattedPost]);
+        toast({
+          title: "Success",
+          description: "Post scheduled successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error creating post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to schedule post",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleEditPost = (post: ScheduledPost) => {
@@ -71,8 +136,28 @@ export default function Scheduling() {
     // TODO: Implement edit functionality
   };
 
-  const handleDeletePost = (id: string) => {
-    setPosts(prev => prev.filter(post => post.id !== id));
+  const handleDeletePost = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('scheduled_posts')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setPosts(prev => prev.filter(post => post.id !== id));
+      toast({
+        title: "Success",
+        description: "Post deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete post",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDateSelect = (date: Date) => {
@@ -90,14 +175,17 @@ export default function Scheduling() {
             Manage and schedule your content across all platforms
           </p>
         </div>
-        <CreatePostDialog 
-          onCreatePost={handleCreatePost} 
-          availableContent={availableContent}
-        />
+        <div className="flex gap-2">
+          <CreatePostDialog 
+            onCreatePost={handleCreatePost} 
+            availableContent={availableContent}
+          />
+          <TwitterSearchDialog />
+        </div>
       </div>
 
       <Tabs defaultValue="calendar" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+        <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
           <TabsTrigger value="calendar" className="flex items-center gap-2">
             <Calendar className="w-4 h-4" />
             Calendar
@@ -105,6 +193,10 @@ export default function Scheduling() {
           <TabsTrigger value="list" className="flex items-center gap-2">
             <List className="w-4 h-4" />
             All Posts
+          </TabsTrigger>
+          <TabsTrigger value="twitter" className="flex items-center gap-2">
+            <Search className="w-4 h-4" />
+            Twitter
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
@@ -122,21 +214,43 @@ export default function Scheduling() {
               <CardTitle>Scheduled Posts ({posts.length})</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {posts.map((post) => (
-                  <ScheduledPostCard
-                    key={post.id}
-                    post={post}
-                    onEdit={handleEditPost}
-                    onDelete={handleDeletePost}
-                  />
-                ))}
-              </div>
-              {posts.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">
-                  No scheduled posts yet. Create your first post to get started!
-                </p>
+              {loading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Loading posts...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {posts.map((post) => (
+                      <ScheduledPostCard
+                        key={post.id}
+                        post={post}
+                        onEdit={handleEditPost}
+                        onDelete={handleDeletePost}
+                      />
+                    ))}
+                  </div>
+                  {posts.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">
+                      No scheduled posts yet. Create your first post to get started!
+                    </p>
+                  )}
+                </>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="twitter" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Twitter Search & Engagement</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-4">
+                Search for tweets by keywords, hashtags, or users to engage with your audience.
+              </p>
+              <TwitterSearchDialog />
             </CardContent>
           </Card>
         </TabsContent>

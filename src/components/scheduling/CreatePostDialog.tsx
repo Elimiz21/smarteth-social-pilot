@@ -14,8 +14,17 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { GeneratedContent } from "../content/ContentLibrary";
 
+interface ScheduledPost {
+  id: string;
+  content: string;
+  scheduledTime: Date;
+  platforms: string[];
+  status: "scheduled" | "published" | "failed";
+  imageUrl?: string;
+}
+
 interface CreatePostDialogProps {
-  onCreatePost: (post: any) => void;
+  onCreatePost: (post: Omit<ScheduledPost, 'id'>) => void;
   availableContent?: GeneratedContent[];
 }
 
@@ -47,7 +56,6 @@ export function CreatePostDialog({ onCreatePost, availableContent = [] }: Create
     scheduledTime.setHours(hours, minutes);
 
     const newPost = {
-      id: Date.now().toString(),
       content,
       scheduledTime,
       platforms: selectedPlatforms,
