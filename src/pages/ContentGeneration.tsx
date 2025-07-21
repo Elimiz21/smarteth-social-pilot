@@ -1,0 +1,309 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Sparkles, 
+  RefreshCw, 
+  Copy, 
+  Edit, 
+  Save, 
+  Wand2,
+  MessageSquare,
+  Image,
+  BarChart3,
+  Settings
+} from "lucide-react";
+
+const aiProviders = [
+  { id: "openai", name: "OpenAI GPT-4", recommended: true },
+  { id: "claude", name: "Anthropic Claude", recommended: true },
+  { id: "gemini", name: "Google Gemini" },
+  { id: "meta", name: "Meta AI" },
+  { id: "perplexity", name: "Perplexity AI" }
+];
+
+const contentTypes = [
+  { id: "tweet", name: "X/Twitter Post", platforms: ["Twitter"] },
+  { id: "linkedin", name: "LinkedIn Article", platforms: ["LinkedIn"] },
+  { id: "instagram", name: "Instagram Post", platforms: ["Instagram"] },
+  { id: "thread", name: "Twitter Thread", platforms: ["Twitter"] },
+  { id: "announcement", name: "Multi-Platform Announcement", platforms: ["All"] }
+];
+
+export default function ContentGeneration() {
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+            AI Content Generation
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Create engaging content for SmartEth marketing campaigns
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline">
+            <Settings className="w-4 h-4 mr-2" />
+            AI Settings
+          </Button>
+          <Button variant="hero">
+            <Sparkles className="w-4 h-4 mr-2" />
+            Generate Content
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Content Configuration */}
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wand2 className="w-5 h-5" />
+              Content Settings
+            </CardTitle>
+            <CardDescription>
+              Configure your content generation parameters
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* AI Provider */}
+            <div className="space-y-2">
+              <Label>AI Provider</Label>
+              <Select defaultValue="openai">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {aiProviders.map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      <div className="flex items-center gap-2">
+                        {provider.name}
+                        {provider.recommended && (
+                          <Badge variant="secondary" className="text-xs">Recommended</Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Content Type */}
+            <div className="space-y-2">
+              <Label>Content Type</Label>
+              <Select defaultValue="tweet">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {contentTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Target Audience */}
+            <div className="space-y-2">
+              <Label>Target Audience</Label>
+              <Select defaultValue="investors">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="investors">Institutional Investors</SelectItem>
+                  <SelectItem value="retail">Retail Crypto Holders</SelectItem>
+                  <SelectItem value="traders">Professional Traders</SelectItem>
+                  <SelectItem value="general">General Public</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Tone */}
+            <div className="space-y-2">
+              <Label>Tone & Style</Label>
+              <Select defaultValue="professional">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="professional">Professional</SelectItem>
+                  <SelectItem value="conversational">Conversational</SelectItem>
+                  <SelectItem value="authoritative">Authoritative</SelectItem>
+                  <SelectItem value="educational">Educational</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Topic/Keywords */}
+            <div className="space-y-2">
+              <Label>Keywords/Topics</Label>
+              <Input placeholder="SmartEth, DeFi, Asset Management..." />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Content Generation Area */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" />
+              Content Prompt Builder
+            </CardTitle>
+            <CardDescription>
+              Craft detailed prompts for AI content generation
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="prompt" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="prompt">Prompt Builder</TabsTrigger>
+                <TabsTrigger value="generated">Generated Content</TabsTrigger>
+                <TabsTrigger value="visual">Visual Content</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="prompt" className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Content Role/Context</Label>
+                    <Textarea 
+                      placeholder="You are an expert crypto marketing strategist for SmartEth, a regulated Israeli asset management firm raising $50M for innovative ETH strategies..."
+                      className="min-h-[120px]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Specific Requirements</Label>
+                    <Textarea 
+                      placeholder="Create content that emphasizes regulatory compliance, institutional credibility, innovative technology, proven track record..."
+                      className="min-h-[120px]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Compliance Guidelines</Label>
+                    <Textarea 
+                      placeholder="Include required disclaimers, avoid promotional language, focus on factual information, emphasize risk disclosures..."
+                      className="min-h-[120px]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Call-to-Action</Label>
+                    <Input placeholder="Learn more at smarteth.com | Contact for institutional inquiries" />
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button variant="hero" className="flex-1">
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Generate 3 Versions
+                  </Button>
+                  <Button variant="outline">
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="generated" className="space-y-4">
+                <div className="space-y-4">
+                  {[1, 2, 3].map((version) => (
+                    <Card key={version} className="border border-accent/20">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base">Version {version}</CardTitle>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              <BarChart3 className="w-3 h-3 mr-1" />
+                              Engagement: 8.5/10
+                            </Badge>
+                            <Button variant="ghost" size="icon-sm">
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon-sm">
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm leading-relaxed">
+                          🚀 Smart ETH strategy update: Our regulated asset management approach continues to deliver exceptional results for institutional clients. With cutting-edge DeFi integration and institutional-grade security, we're redefining crypto investment standards. 
+                          
+                          #SmartETH #InstitutionalCrypto #DeFi #AssetManagement
+                          
+                          Learn more about our $50M fundraising at smarteth.com
+                        </p>
+                        <div className="flex justify-between items-center mt-4 pt-3 border-t">
+                          <div className="text-xs text-muted-foreground">
+                            Character count: 287/280 | Estimated reach: 2.5K
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline">Edit</Button>
+                            <Button size="sm" variant="success">Approve</Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="visual" className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Visual Content Prompt</Label>
+                    <Textarea 
+                      placeholder="Create a professional financial chart showing ETH performance, modern corporate design, SmartEth branding..."
+                      className="min-h-[120px]"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Image Style</Label>
+                      <Select defaultValue="professional">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="professional">Professional</SelectItem>
+                          <SelectItem value="modern">Modern Tech</SelectItem>
+                          <SelectItem value="corporate">Corporate</SelectItem>
+                          <SelectItem value="infographic">Infographic</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Dimensions</Label>
+                      <Select defaultValue="square">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="square">Square (1:1)</SelectItem>
+                          <SelectItem value="landscape">Landscape (16:9)</SelectItem>
+                          <SelectItem value="portrait">Portrait (9:16)</SelectItem>
+                          <SelectItem value="twitter">Twitter Card (2:1)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <Button variant="accent" className="w-full">
+                    <Image className="w-4 h-4 mr-2" />
+                    Generate Visual Content
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
