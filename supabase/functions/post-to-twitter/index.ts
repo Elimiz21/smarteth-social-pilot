@@ -75,12 +75,24 @@ function generateOAuthHeader(method: string, url: string): string {
 }
 
 async function sendTweet(tweetText: string): Promise<any> {
+  // Validate credentials first
+  if (!API_KEY || !API_SECRET || !ACCESS_TOKEN || !ACCESS_TOKEN_SECRET) {
+    console.error("Missing Twitter credentials:", {
+      hasApiKey: !!API_KEY,
+      hasApiSecret: !!API_SECRET,
+      hasAccessToken: !!ACCESS_TOKEN,
+      hasAccessTokenSecret: !!ACCESS_TOKEN_SECRET
+    });
+    throw new Error("Missing Twitter API credentials");
+  }
+
   const url = "https://api.x.com/2/tweets";
   const method = "POST";
   const params = { text: tweetText };
 
   const oauthHeader = generateOAuthHeader(method, url);
   console.log("Sending tweet:", tweetText);
+  console.log("OAuth Header:", oauthHeader);
 
   const response = await fetch(url, {
     method: method,
