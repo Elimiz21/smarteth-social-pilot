@@ -154,39 +154,6 @@ export type Database = {
         }
         Relationships: []
       }
-      social_media_credentials: {
-        Row: {
-          created_at: string
-          credentials: Json
-          expires_at: string | null
-          id: string
-          is_active: boolean | null
-          platform: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          credentials: Json
-          expires_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          platform: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          credentials?: Json
-          expires_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          platform?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
