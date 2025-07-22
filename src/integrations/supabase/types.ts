@@ -186,6 +186,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_engagement_analytics: {
+        Args: { start_date?: string; end_date?: string; user_filter?: string }
+        Returns: {
+          avg_engagement_rate: number
+          top_performing_posts: Json
+          platform_engagement: Json
+        }[]
+      }
+      get_post_analytics: {
+        Args: { start_date?: string; end_date?: string; user_filter?: string }
+        Returns: {
+          total_posts: number
+          published_posts: number
+          failed_posts: number
+          success_rate: number
+          platform_stats: Json
+          daily_stats: Json
+        }[]
+      }
       get_posts_ready_for_publishing: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -203,6 +222,14 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string
+        }[]
+      }
+      get_schedule_analytics: {
+        Args: { start_date?: string; end_date?: string; user_filter?: string }
+        Returns: {
+          hourly_distribution: Json
+          day_of_week_distribution: Json
+          optimal_posting_times: Json
         }[]
       }
       is_owner: {
