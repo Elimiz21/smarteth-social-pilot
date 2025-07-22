@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
 
     console.log('Updating Twitter secrets...');
 
-    // Update each secret using the Supabase Management API
+    // Store secrets in a custom table since Management API requires different auth
     const secrets = [
       { name: 'TWITTER_CONSUMER_KEY', value: TWITTER_CONSUMER_KEY },
       { name: 'TWITTER_CONSUMER_SECRET', value: TWITTER_CONSUMER_SECRET },
@@ -82,34 +82,25 @@ Deno.serve(async (req) => {
       { name: 'TWITTER_ACCESS_TOKEN_SECRET', value: TWITTER_ACCESS_TOKEN_SECRET }
     ];
 
-    const projectRef = Deno.env.get('SUPABASE_URL')?.split('//')[1]?.split('.')[0];
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
+    // Store in a table that can be accessed by other edge functions
     for (const secret of secrets) {
-      console.log(`Updating secret: ${secret.name}`);
+      console.log(`Storing secret: ${secret.name}`);
       
-      const response = await fetch(
-        `https://api.supabase.com/v1/projects/${projectRef}/secrets`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${serviceRoleKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify([{
-            name: secret.name,
-            value: secret.value
-          }])
-        }
-      );
+      const { error } = await supabase
+        .from('app_secrets')
+        .upsert({
+          name: secret.name,
+          value: secret.value,
+          updated_by: user.id,
+          updated_at: new Date().toISOString()
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Failed to update secret ${secret.name}:`, response.status, errorText);
+      if (error) {
+        console.error(`Failed to store secret ${secret.name}:`, error);
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: `Failed to update ${secret.name}: ${errorText}` 
+            error: `Failed to store ${secret.name}: ${error.message}` 
           }),
           { 
             status: 500, 
@@ -118,7 +109,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log(`Successfully updated secret: ${secret.name}`);
+      console.log(`Successfully stored secret: ${secret.name}`);
     }
 
     console.log('All Twitter secrets updated successfully');
