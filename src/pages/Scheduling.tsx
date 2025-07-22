@@ -7,6 +7,7 @@ import { SchedulingCalendar } from "@/components/scheduling/SchedulingCalendar";
 import { Calendar, List, BarChart3, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import type { GeneratedContent } from "@/components/content/ContentLibrary";
 import { TwitterSearchDialog } from "@/components/scheduling/TwitterSearchDialog";
 
@@ -21,6 +22,7 @@ interface ScheduledPost {
 
 export default function Scheduling() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -91,6 +93,15 @@ export default function Scheduling() {
 
   const handleCreatePost = async (newPost: Omit<ScheduledPost, 'id'>) => {
     try {
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to schedule posts",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { data, error } = await supabase
         .from('scheduled_posts')
         .insert([{
@@ -99,7 +110,7 @@ export default function Scheduling() {
           platforms: newPost.platforms,
           status: newPost.status,
           image_url: newPost.imageUrl,
-          user_id: '00000000-0000-0000-0000-000000000000' // TODO: Replace with actual user ID
+          user_id: user.id
         }])
         .select()
         .single();
