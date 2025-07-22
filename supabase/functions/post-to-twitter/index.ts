@@ -11,10 +11,30 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-const API_KEY = Deno.env.get("TWITTER_CONSUMER_KEY")?.trim();
-const API_SECRET = Deno.env.get("TWITTER_CONSUMER_SECRET")?.trim();
-const ACCESS_TOKEN = Deno.env.get("TWITTER_ACCESS_TOKEN")?.trim();
-const ACCESS_TOKEN_SECRET = Deno.env.get("TWITTER_ACCESS_TOKEN_SECRET")?.trim();
+// Function to get secrets from database
+async function getTwitterCredentials() {
+  const { data, error } = await supabase
+    .from('app_secrets')
+    .select('name, value')
+    .in('name', ['TWITTER_CONSUMER_KEY', 'TWITTER_CONSUMER_SECRET', 'TWITTER_ACCESS_TOKEN', 'TWITTER_ACCESS_TOKEN_SECRET']);
+
+  if (error) {
+    console.error('Error fetching secrets:', error);
+    return null;
+  }
+
+  const secrets: Record<string, string> = {};
+  data.forEach(secret => {
+    secrets[secret.name] = secret.value;
+  });
+
+  return {
+    API_KEY: secrets.TWITTER_CONSUMER_KEY?.trim(),
+    API_SECRET: secrets.TWITTER_CONSUMER_SECRET?.trim(),
+    ACCESS_TOKEN: secrets.TWITTER_ACCESS_TOKEN?.trim(),
+    ACCESS_TOKEN_SECRET: secrets.TWITTER_ACCESS_TOKEN_SECRET?.trim()
+  };
+}
 
 function generateOAuthSignature(
   method: string,
@@ -39,13 +59,13 @@ function generateOAuthSignature(
   return signature;
 }
 
-function generateOAuthHeader(method: string, url: string): string {
+function generateOAuthHeader(method: string, url: string, credentials: any): string {
   const oauthParams = {
-    oauth_consumer_key: API_KEY!,
+    oauth_consumer_key: credentials.API_KEY!,
     oauth_nonce: Math.random().toString(36).substring(2),
     oauth_signature_method: "HMAC-SHA1",
     oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-    oauth_token: ACCESS_TOKEN!,
+    oauth_token: credentials.ACCESS_TOKEN!,
     oauth_version: "1.0",
   };
 
@@ -53,8 +73,8 @@ function generateOAuthHeader(method: string, url: string): string {
     method,
     url,
     oauthParams,
-    API_SECRET!,
-    ACCESS_TOKEN_SECRET!
+    credentials.API_SECRET!,
+    credentials.ACCESS_TOKEN_SECRET!
   );
 
   const signedOAuthParams = {
@@ -75,13 +95,20 @@ function generateOAuthHeader(method: string, url: string): string {
 }
 
 async function sendTweet(tweetText: string): Promise<any> {
-  // Validate credentials first
-  if (!API_KEY || !API_SECRET || !ACCESS_TOKEN || !ACCESS_TOKEN_SECRET) {
+  // Get credentials from database
+  const credentials = await getTwitterCredentials();
+  
+  if (!credentials) {
+    throw new Error('Failed to fetch Twitter credentials from database');
+  }
+
+  // Validate credentials
+  if (!credentials.API_KEY || !credentials.API_SECRET || !credentials.ACCESS_TOKEN || !credentials.ACCESS_TOKEN_SECRET) {
     console.error("Missing Twitter credentials:", {
-      hasApiKey: !!API_KEY,
-      hasApiSecret: !!API_SECRET,
-      hasAccessToken: !!ACCESS_TOKEN,
-      hasAccessTokenSecret: !!ACCESS_TOKEN_SECRET
+      hasApiKey: !!credentials.API_KEY,
+      hasApiSecret: !!credentials.API_SECRET,
+      hasAccessToken: !!credentials.ACCESS_TOKEN,
+      hasAccessTokenSecret: !!credentials.ACCESS_TOKEN_SECRET
     });
     throw new Error("Missing Twitter API credentials");
   }
@@ -90,7 +117,7 @@ async function sendTweet(tweetText: string): Promise<any> {
   const method = "POST";
   const params = { text: tweetText };
 
-  const oauthHeader = generateOAuthHeader(method, url);
+  const oauthHeader = generateOAuthHeader(method, url, credentials);
   console.log("Sending tweet:", tweetText);
   console.log("OAuth Header:", oauthHeader);
 

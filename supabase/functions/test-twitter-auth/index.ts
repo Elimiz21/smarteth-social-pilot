@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { createHmac } from "node:crypto";
 
 const corsHeaders = {
@@ -6,10 +7,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const API_KEY = Deno.env.get("TWITTER_CONSUMER_KEY")?.trim();
-const API_SECRET = Deno.env.get("TWITTER_CONSUMER_SECRET")?.trim();
-const ACCESS_TOKEN = Deno.env.get("TWITTER_ACCESS_TOKEN")?.trim();
-const ACCESS_TOKEN_SECRET = Deno.env.get("TWITTER_ACCESS_TOKEN_SECRET")?.trim();
+// Function to get secrets from database
+async function getTwitterCredentials() {
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  )
+
+  const { data, error } = await supabase
+    .from('app_secrets')
+    .select('name, value')
+    .in('name', ['TWITTER_CONSUMER_KEY', 'TWITTER_CONSUMER_SECRET', 'TWITTER_ACCESS_TOKEN', 'TWITTER_ACCESS_TOKEN_SECRET']);
+
+  if (error) {
+    console.error('Error fetching secrets:', error);
+    return null;
+  }
+
+  const secrets: Record<string, string> = {};
+  data.forEach(secret => {
+    secrets[secret.name] = secret.value;
+  });
+
+  return {
+    API_KEY: secrets.TWITTER_CONSUMER_KEY?.trim(),
+    API_SECRET: secrets.TWITTER_CONSUMER_SECRET?.trim(),
+    ACCESS_TOKEN: secrets.TWITTER_ACCESS_TOKEN?.trim(),
+    ACCESS_TOKEN_SECRET: secrets.TWITTER_ACCESS_TOKEN_SECRET?.trim()
+  };
+}
 
 function generateOAuthSignature(
   method: string,
@@ -34,13 +60,13 @@ function generateOAuthSignature(
   return signature;
 }
 
-function generateOAuthHeader(method: string, url: string): string {
+function generateOAuthHeader(method: string, url: string, credentials: any): string {
   const oauthParams = {
-    oauth_consumer_key: API_KEY!,
+    oauth_consumer_key: credentials.API_KEY!,
     oauth_nonce: Math.random().toString(36).substring(2),
     oauth_signature_method: "HMAC-SHA1",
     oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-    oauth_token: ACCESS_TOKEN!,
+    oauth_token: credentials.ACCESS_TOKEN!,
     oauth_version: "1.0",
   };
 
@@ -48,8 +74,8 @@ function generateOAuthHeader(method: string, url: string): string {
     method,
     url,
     oauthParams,
-    API_SECRET!,
-    ACCESS_TOKEN_SECRET!
+    credentials.API_SECRET!,
+    credentials.ACCESS_TOKEN_SECRET!
   );
 
   const signedOAuthParams = {
@@ -70,32 +96,39 @@ function generateOAuthHeader(method: string, url: string): string {
 }
 
 async function testTwitterAuth(): Promise<any> {
-  // First check if all credentials are present
-  if (!API_KEY || !API_SECRET || !ACCESS_TOKEN || !ACCESS_TOKEN_SECRET) {
+  // Get credentials from database
+  const credentials = await getTwitterCredentials();
+  
+  if (!credentials) {
+    throw new Error('Failed to fetch Twitter credentials from database');
+  }
+
+  // Check if all credentials are present
+  if (!credentials.API_KEY || !credentials.API_SECRET || !credentials.ACCESS_TOKEN || !credentials.ACCESS_TOKEN_SECRET) {
     const missing = [];
-    if (!API_KEY) missing.push("TWITTER_CONSUMER_KEY");
-    if (!API_SECRET) missing.push("TWITTER_CONSUMER_SECRET");
-    if (!ACCESS_TOKEN) missing.push("TWITTER_ACCESS_TOKEN");
-    if (!ACCESS_TOKEN_SECRET) missing.push("TWITTER_ACCESS_TOKEN_SECRET");
+    if (!credentials.API_KEY) missing.push("TWITTER_CONSUMER_KEY");
+    if (!credentials.API_SECRET) missing.push("TWITTER_CONSUMER_SECRET");
+    if (!credentials.ACCESS_TOKEN) missing.push("TWITTER_ACCESS_TOKEN");
+    if (!credentials.ACCESS_TOKEN_SECRET) missing.push("TWITTER_ACCESS_TOKEN_SECRET");
     
     throw new Error(`Missing Twitter credentials: ${missing.join(", ")}`);
   }
 
   console.log("Testing Twitter authentication...");
   console.log("Credentials check:", {
-    hasApiKey: !!API_KEY,
-    hasApiSecret: !!API_SECRET,
-    hasAccessToken: !!ACCESS_TOKEN,
-    hasAccessTokenSecret: !!ACCESS_TOKEN_SECRET,
-    apiKeyLength: API_KEY?.length,
-    accessTokenLength: ACCESS_TOKEN?.length
+    hasApiKey: !!credentials.API_KEY,
+    hasApiSecret: !!credentials.API_SECRET,
+    hasAccessToken: !!credentials.ACCESS_TOKEN,
+    hasAccessTokenSecret: !!credentials.ACCESS_TOKEN_SECRET,
+    apiKeyLength: credentials.API_KEY?.length,
+    accessTokenLength: credentials.ACCESS_TOKEN?.length
   });
 
   // Test with a simple GET request to verify credentials
   const url = "https://api.x.com/2/users/me";
   const method = "GET";
   
-  const oauthHeader = generateOAuthHeader(method, url);
+  const oauthHeader = generateOAuthHeader(method, url, credentials);
   console.log("Generated OAuth Header:", oauthHeader);
 
   const response = await fetch(url, {
