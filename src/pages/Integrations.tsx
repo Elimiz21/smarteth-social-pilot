@@ -19,6 +19,7 @@ import {
   ExternalLink
 } from "lucide-react";
 import { TwitterCredentialsDialog } from "@/components/TwitterCredentialsDialog";
+import { TwitterTestButton } from "@/components/TwitterTestButton";
 
 // System-wide platform configurations
 const socialPlatformConfigs = [
@@ -196,7 +197,7 @@ export default function Integrations() {
                     </div>
                   </div>
                   
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Button variant="outline" size="sm" asChild>
                       <a href={platform.helpUrl} target="_blank" rel="noopener noreferrer">
                         Setup Guide
@@ -204,18 +205,19 @@ export default function Integrations() {
                       </a>
                     </Button>
                     {platform.id === 'twitter' ? (
-                      <TwitterCredentialsDialog />
+                      <>
+                        <TwitterCredentialsDialog />
+                        <TwitterTestButton />
+                      </>
                     ) : (
-                      <Button variant="outline" size="sm" asChild>
-                        <a 
-                          href="https://supabase.com/dashboard/project/vwylsusacaucxyphbxad/settings/functions" 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                        >
-                          Add Secrets
-                          <ExternalLink className="w-3 h-3 ml-1" />
-                        </a>
-                      </Button>
+                      <>
+                        <Button variant="outline" size="sm" disabled>
+                          Edit Credentials
+                        </Button>
+                        <Button variant="outline" size="sm" disabled>
+                          Test Connection
+                        </Button>
+                      </>
                     )}
                   </div>
                 </CardContent>
@@ -250,25 +252,19 @@ export default function Integrations() {
                     </code>
                   </div>
                   
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Button variant="outline" size="sm" asChild>
                       <a href={service.helpUrl} target="_blank" rel="noopener noreferrer">
                         Get API Key
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </a>
                     </Button>
-                    {!service.configured && (
-                      <Button variant="outline" size="sm" asChild>
-                        <a 
-                          href="https://supabase.com/dashboard/project/vwylsusacaucxyphbxad/settings/functions" 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                        >
-                          Add Secret
-                          <ExternalLink className="w-3 h-3 ml-1" />
-                        </a>
-                      </Button>
-                    )}
+                    <Button variant="outline" size="sm" disabled>
+                      Edit Credentials
+                    </Button>
+                    <Button variant="outline" size="sm" disabled>
+                      Test Connection
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
