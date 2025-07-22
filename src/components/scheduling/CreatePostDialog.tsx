@@ -162,7 +162,11 @@ export function CreatePostDialog({ onCreatePost, availableContent = [] }: Create
                         mode="single"
                         selected={selectedDate}
                         onSelect={setSelectedDate}
-                        disabled={(date) => date < new Date()}
+                        disabled={(date) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          return date < today;
+                        }}
                         initialFocus
                         className="p-3 pointer-events-auto"
                       />
@@ -278,7 +282,11 @@ export function CreatePostDialog({ onCreatePost, availableContent = [] }: Create
                           mode="single"
                           selected={selectedDate}
                           onSelect={setSelectedDate}
-                          disabled={(date) => date < new Date()}
+                          disabled={(date) => {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            return date < today;
+                          }}
                           initialFocus
                           className="p-3 pointer-events-auto"
                         />
