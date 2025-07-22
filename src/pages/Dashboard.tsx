@@ -20,61 +20,39 @@ import {
 const statsCards = [
   {
     title: "Total Followers",
-    value: "2,847",
-    change: "+12.5%",
+    value: "0",
+    change: "+0%",
     trend: "up",
     icon: Users,
     color: "accent"
   },
   {
     title: "Engagement Rate",
-    value: "8.4%",
-    change: "+2.1%",
+    value: "0%",
+    change: "+0%",
     trend: "up", 
     icon: Heart,
     color: "success"
   },
   {
     title: "Qualified Leads",
-    value: "156",
-    change: "+23.4%",
+    value: "0",
+    change: "+0%",
     trend: "up",
     icon: Target,
     color: "primary"
   },
   {
     title: "Campaign ROI",
-    value: "$4.2M",
-    change: "+18.7%",
+    value: "$0",
+    change: "+0%",
     trend: "up",
     icon: DollarSign,
     color: "warning"
   }
 ];
 
-const recentPosts = [
-  {
-    platform: "X/Twitter",
-    content: "🚀 Smart ETH strategy reaching new milestones! Our innovative approach to crypto asset management...",
-    engagement: { likes: 234, shares: 67, comments: 43 },
-    timestamp: "2 hours ago",
-    status: "posted"
-  },
-  {
-    platform: "LinkedIn",
-    content: "Institutional investors are taking notice of our regulated crypto fund...",
-    engagement: { likes: 89, shares: 23, comments: 15 },
-    timestamp: "4 hours ago", 
-    status: "posted"
-  },
-  {
-    platform: "Telegram",
-    content: "Weekly market update: Smart ETH performance analysis and upcoming opportunities...",
-    engagement: { likes: 156, shares: 34, comments: 28 },
-    timestamp: "6 hours ago",
-    status: "scheduled"
-  }
-];
+const recentPosts: any[] = [];
 
 export default function Dashboard() {
   return (
@@ -136,32 +114,39 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {recentPosts.map((post, index) => (
-              <div key={index} className="flex items-start gap-4 p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors">
-                <div className="w-2 h-2 rounded-full bg-accent mt-2"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline">{post.platform}</Badge>
-                    <span className="text-xs text-muted-foreground">{post.timestamp}</span>
-                  </div>
-                  <p className="text-sm text-foreground">{post.content}</p>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Heart className="w-3 h-3" />
-                      {post.engagement.likes}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Share2 className="w-3 h-3" />
-                      {post.engagement.shares}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MessageSquare className="w-3 h-3" />
-                      {post.engagement.comments}
-                    </span>
+            {recentPosts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No posts yet. Start by creating your first post!</p>
+              </div>
+            ) : (
+              recentPosts.map((post, index) => (
+                <div key={index} className="flex items-start gap-4 p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors">
+                  <div className="w-2 h-2 rounded-full bg-accent mt-2"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline">{post.platform}</Badge>
+                      <span className="text-xs text-muted-foreground">{post.timestamp}</span>
+                    </div>
+                    <p className="text-sm text-foreground">{post.content}</p>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Heart className="w-3 h-3" />
+                        {post.engagement.likes}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Share2 className="w-3 h-3" />
+                        {post.engagement.shares}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <MessageSquare className="w-3 h-3" />
+                        {post.engagement.comments}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -179,23 +164,23 @@ export default function Dashboard() {
               <div>
                 <div className="flex justify-between text-sm mb-2">
                   <span>Followers Goal</span>
-                  <span>2,847 / 10,000</span>
+                  <span>0 / 10,000</span>
                 </div>
-                <Progress value={28} className="h-2" />
+                <Progress value={0} className="h-2" />
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-2">
                   <span>Lead Generation</span>
-                  <span>156 / 500</span>
+                  <span>0 / 500</span>
                 </div>
-                <Progress value={31} className="h-2" />
+                <Progress value={0} className="h-2" />
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-2">
                   <span>Fundraising Progress</span>
-                  <span>$4.2M / $50M</span>
+                  <span>$0 / $50M</span>
                 </div>
-                <Progress value={8} className="h-2" />
+                <Progress value={0} className="h-2" />
               </div>
             </CardContent>
           </Card>
