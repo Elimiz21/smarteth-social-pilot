@@ -211,6 +211,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      is_owner: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
       update_post_execution_status: {
         Args: {
           p_execution_id: string
