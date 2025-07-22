@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import type { GeneratedContent } from "@/components/content/ContentLibrary";
 import { TwitterSearchDialog } from "@/components/scheduling/TwitterSearchDialog";
-import { TwitterTestButton } from "@/components/TwitterTestButton";
+
 
 interface ScheduledPost {
   id: string;
@@ -188,7 +188,6 @@ export default function Scheduling() {
           </p>
         </div>
         <div className="flex gap-2">
-          <TwitterTestButton />
           <CreatePostDialog 
             onCreatePost={handleCreatePost} 
             availableContent={availableContent}
