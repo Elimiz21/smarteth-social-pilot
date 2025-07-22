@@ -18,6 +18,7 @@ import {
   ShieldX,
   ExternalLink
 } from "lucide-react";
+import { TwitterCredentialsDialog } from "@/components/TwitterCredentialsDialog";
 
 // System-wide platform configurations
 const socialPlatformConfigs = [
@@ -202,16 +203,20 @@ export default function Integrations() {
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </a>
                     </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <a 
-                        href="https://supabase.com/dashboard/project/vwylsusacaucxyphbxad/settings/functions" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                      >
-                        Add Secrets
-                        <ExternalLink className="w-3 h-3 ml-1" />
-                      </a>
-                    </Button>
+                    {platform.id === 'twitter' ? (
+                      <TwitterCredentialsDialog />
+                    ) : (
+                      <Button variant="outline" size="sm" asChild>
+                        <a 
+                          href="https://supabase.com/dashboard/project/vwylsusacaucxyphbxad/settings/functions" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                        >
+                          Add Secrets
+                          <ExternalLink className="w-3 h-3 ml-1" />
+                        </a>
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
