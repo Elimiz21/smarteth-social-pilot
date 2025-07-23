@@ -87,7 +87,8 @@ export const CredentialsDialog = ({ platformName, fields, triggerLabel = "Edit C
           try {
             const testResult = await supabase.functions.invoke('test-credentials', {
               body: {
-                service: platformName.toLowerCase()
+                service: platformName.toLowerCase() === 'openai' ? 'openai' : platformName.toLowerCase(),
+                platform: ['twitter', 'linkedin', 'instagram', 'telegram', 'youtube'].includes(platformName.toLowerCase()) ? platformName.toLowerCase() : undefined
               }
             });
             
