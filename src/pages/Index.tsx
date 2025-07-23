@@ -1,6 +1,7 @@
 import Dashboard from "./Dashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { AuthDebugDialog } from "@/components/AuthDebugDialog";
 
 const Index = () => {
   const { user, profile } = useAuth();
@@ -154,7 +155,8 @@ User unable to configure OpenAI API key for AI content generation functionality 
   
   return (
     <div>
-      <div className="fixed top-4 right-4 z-50">
+      <div className="fixed top-4 right-4 z-50 flex gap-2">
+        <AuthDebugDialog />
         <Button onClick={downloadAuditFile} variant="outline">
           Download Audit File
         </Button>
