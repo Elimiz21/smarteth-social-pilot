@@ -65,9 +65,25 @@ serve(async (req) => {
       });
     }
 
-    // Get secrets from Supabase environment
-    const getSecret = (name: string) => {
-      return Deno.env.get(name);
+    // Get secrets from database
+    const getSecret = async (name: string): Promise<string | null> => {
+      try {
+        const { data, error } = await supabaseClient
+          .from('app_secrets')
+          .select('value')
+          .eq('name', name)
+          .single();
+        
+        if (error || !data) {
+          console.log(`Secret ${name} not found in database`);
+          return null;
+        }
+        
+        return data.value;
+      } catch (err) {
+        console.error(`Error fetching secret ${name}:`, err);
+        return null;
+      }
     };
 
     let testResult: { configured: boolean; error: string | null } = { configured: false, error: null };
@@ -77,10 +93,10 @@ serve(async (req) => {
         // Test social media platforms
         switch (platform) {
           case 'twitter': {
-            const consumerKey = getSecret('TWITTER_CONSUMER_KEY');
-            const consumerSecret = getSecret('TWITTER_CONSUMER_SECRET');
-            const accessToken = getSecret('TWITTER_ACCESS_TOKEN');
-            const accessTokenSecret = getSecret('TWITTER_ACCESS_TOKEN_SECRET');
+            const consumerKey = await getSecret('TWITTER_CONSUMER_KEY');
+            const consumerSecret = await getSecret('TWITTER_CONSUMER_SECRET');
+            const accessToken = await getSecret('TWITTER_ACCESS_TOKEN');
+            const accessTokenSecret = await getSecret('TWITTER_ACCESS_TOKEN_SECRET');
             
             if (consumerKey && consumerSecret && accessToken && accessTokenSecret) {
               // For Twitter, just check if credentials exist due to rate limiting
@@ -92,23 +108,23 @@ serve(async (req) => {
             break;
           }
           case 'linkedin': {
-            const clientId = getSecret('LINKEDIN_CLIENT_ID');
-            const clientSecret = getSecret('LINKEDIN_CLIENT_SECRET');
-            const accessToken = getSecret('LINKEDIN_ACCESS_TOKEN');
+            const clientId = await getSecret('LINKEDIN_CLIENT_ID');
+            const clientSecret = await getSecret('LINKEDIN_CLIENT_SECRET');
+            const accessToken = await getSecret('LINKEDIN_ACCESS_TOKEN');
             
             testResult.configured = !!(clientId && clientSecret && accessToken);
             break;
           }
           case 'instagram': {
-            const accessToken = getSecret('INSTAGRAM_ACCESS_TOKEN');
-            const pageId = getSecret('INSTAGRAM_PAGE_ID');
+            const accessToken = await getSecret('INSTAGRAM_ACCESS_TOKEN');
+            const pageId = await getSecret('INSTAGRAM_PAGE_ID');
             
             testResult.configured = !!(accessToken && pageId);
             break;
           }
           case 'telegram': {
-            const botToken = getSecret('TELEGRAM_BOT_TOKEN');
-            const chatId = getSecret('TELEGRAM_CHAT_ID');
+            const botToken = await getSecret('TELEGRAM_BOT_TOKEN');
+            const chatId = await getSecret('TELEGRAM_CHAT_ID');
             
             if (botToken && chatId) {
               // Test Telegram API
@@ -126,9 +142,9 @@ serve(async (req) => {
             break;
           }
           case 'youtube': {
-            const clientId = getSecret('YOUTUBE_CLIENT_ID');
-            const clientSecret = getSecret('YOUTUBE_CLIENT_SECRET');
-            const refreshToken = getSecret('YOUTUBE_REFRESH_TOKEN');
+            const clientId = await getSecret('YOUTUBE_CLIENT_ID');
+            const clientSecret = await getSecret('YOUTUBE_CLIENT_SECRET');
+            const refreshToken = await getSecret('YOUTUBE_REFRESH_TOKEN');
             
             testResult.configured = !!(clientId && clientSecret && refreshToken);
             break;
@@ -138,7 +154,7 @@ serve(async (req) => {
         // Test AI services
         switch (service) {
           case 'openai': {
-            const apiKey = getSecret('OPENAI_API_KEY');
+            const apiKey = await getSecret('OPENAI_API_KEY');
             
             console.log('Testing OpenAI with API key:', apiKey ? `${apiKey.substring(0, 10)}...` : 'null');
             
@@ -169,7 +185,7 @@ serve(async (req) => {
             break;
           }
           case 'anthropic': {
-            const apiKey = getSecret('ANTHROPIC_API_KEY');
+            const apiKey = await getSecret('ANTHROPIC_API_KEY');
             
             if (apiKey) {
               try {
@@ -197,7 +213,7 @@ serve(async (req) => {
             break;
           }
           case 'gemini': {
-            const apiKey = getSecret('GEMINI_API_KEY');
+            const apiKey = await getSecret('GEMINI_API_KEY');
             
             if (apiKey) {
               try {
@@ -213,7 +229,7 @@ serve(async (req) => {
             break;
           }
           case 'perplexity': {
-            const apiKey = getSecret('PERPLEXITY_API_KEY');
+            const apiKey = await getSecret('PERPLEXITY_API_KEY');
             
             if (apiKey) {
               try {
