@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   Globe, 
   Twitter, 
@@ -16,7 +18,8 @@ import {
   X,
   AlertTriangle,
   ShieldX,
-  ExternalLink
+  ExternalLink,
+  RefreshCw
 } from "lucide-react";
 import { TwitterCredentialsDialog } from "@/components/TwitterCredentialsDialog";
 import { TwitterTestButton } from "@/components/TwitterTestButton";
@@ -108,8 +111,99 @@ const aiServiceConfigs = [
 
 export default function Integrations() {
   const { user, profile } = useAuth();
+  const { toast } = useToast();
+  const [platformStatuses, setPlatformStatuses] = useState<Record<string, boolean>>({});
+  const [serviceStatuses, setServiceStatuses] = useState<Record<string, boolean>>({});
+  const [testing, setTesting] = useState<Record<string, boolean>>({});
 
-  const getStatusBadge = (configured: boolean) => {
+  const testCredentials = async (type: 'platform' | 'service', id: string) => {
+    setTesting(prev => ({ ...prev, [id]: true }));
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('test-credentials', {
+        body: type === 'platform' ? { platform: id } : { service: id }
+      });
+
+      if (error) {
+        console.error(`Error testing ${id} credentials:`, error);
+        toast({
+          title: "Test Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      const isConfigured = data?.configured === true;
+      
+      if (type === 'platform') {
+        setPlatformStatuses(prev => ({ ...prev, [id]: isConfigured }));
+      } else {
+        setServiceStatuses(prev => ({ ...prev, [id]: isConfigured }));
+      }
+
+      if (data?.error) {
+        toast({
+          title: "Credentials Invalid",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+
+      return isConfigured;
+    } catch (err: any) {
+      console.error('Error:', err);
+      toast({
+        title: "Test Error",
+        description: err.message || "An unexpected error occurred",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setTesting(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  // Test all credentials on mount
+  useEffect(() => {
+    if (user && profile?.role === 'owner') {
+      // Test social platforms
+      socialPlatformConfigs.forEach(platform => {
+        testCredentials('platform', platform.id);
+      });
+      
+      // Test AI services
+      aiServiceConfigs.forEach(service => {
+        testCredentials('service', service.id);
+      });
+    }
+  }, [user, profile]);
+
+  const refreshCredentials = () => {
+    // Test all credentials again
+    socialPlatformConfigs.forEach(platform => {
+      testCredentials('platform', platform.id);
+    });
+    
+    aiServiceConfigs.forEach(service => {
+      testCredentials('service', service.id);
+    });
+    
+    toast({
+      title: "Refreshing Status",
+      description: "Testing all credentials...",
+    });
+  };
+
+  const getStatusBadge = (configured: boolean, isLoading: boolean = false) => {
+    if (isLoading) {
+      return (
+        <Badge variant="outline">
+          <RefreshCw className="w-3 h-3 mr-1 animate-spin" />Testing...
+        </Badge>
+      );
+    }
+    
     return configured ? (
       <Badge className="bg-success text-success-foreground">
         <Check className="w-3 h-3 mr-1" />Connected
@@ -149,17 +243,23 @@ export default function Integrations() {
             Configure system-wide accounts and API keys for all users
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <a 
-            href="https://supabase.com/dashboard/project/vwylsusacaucxyphbxad/settings/functions" 
-            target="_blank" 
-            rel="noopener noreferrer"
-          >
-            <Settings className="w-4 h-4 mr-2" />
-            Manage Secrets
-            <ExternalLink className="w-3 h-3 ml-1" />
-          </a>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={refreshCredentials}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh Status
+          </Button>
+          <Button variant="outline" asChild>
+            <a 
+              href="https://supabase.com/dashboard/project/vwylsusacaucxyphbxad/settings/functions" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Manage Secrets
+              <ExternalLink className="w-3 h-3 ml-1" />
+            </a>
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="social" className="space-y-6">
@@ -183,7 +283,7 @@ export default function Integrations() {
                         <CardDescription className="text-sm">{platform.description}</CardDescription>
                       </div>
                     </div>
-                    {getStatusBadge(platform.configured)}
+                    {getStatusBadge(platformStatuses[platform.id] ?? false, testing[platform.id])}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -204,6 +304,19 @@ export default function Integrations() {
                         Setup Guide
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </a>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => testCredentials('platform', platform.id)}
+                      disabled={testing[platform.id]}
+                    >
+                      {testing[platform.id] ? (
+                        <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                      )}
+                      Test
                     </Button>
                     {platform.id === 'twitter' ? (
                       <>
@@ -271,7 +384,7 @@ export default function Integrations() {
                         <CardDescription className="text-sm">{service.description}</CardDescription>
                       </div>
                     </div>
-                    {getStatusBadge(service.configured)}
+                    {getStatusBadge(serviceStatuses[service.id] ?? false, testing[service.id])}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -288,6 +401,19 @@ export default function Integrations() {
                         Get API Key
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </a>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => testCredentials('service', service.id)}
+                      disabled={testing[service.id]}
+                    >
+                      {testing[service.id] ? (
+                        <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                      )}
+                      Test
                     </Button>
                     <CredentialsDialog
                       platformName={service.name}
