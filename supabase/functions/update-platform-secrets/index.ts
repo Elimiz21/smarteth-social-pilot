@@ -65,41 +65,34 @@ serve(async (req) => {
       });
     }
 
-    // Update secrets in app_secrets table
-    const secretUpdates = [];
+    console.log(`Updating ${platform} secrets:`, Object.keys(secrets));
+
+    // In this implementation, we acknowledge the secret update request
+    // The actual secrets need to be updated in Supabase Edge Function Secrets manually
+    // This function validates the request and confirms the format is correct
+    
+    const validSecrets = [];
     for (const [secretName, secretValue] of Object.entries(secrets)) {
       if (typeof secretValue === 'string' && secretValue.trim()) {
-        secretUpdates.push(
-          supabaseClient
-            .from('app_secrets')
-            .upsert({
-              name: secretName,
-              value: secretValue.trim(),
-              updated_by: user.id
-            })
-        );
+        validSecrets.push(secretName);
+        console.log(`Secret ${secretName}: ${secretValue.substring(0, 10)}...`);
       }
     }
 
-    // Execute all updates
-    const results = await Promise.allSettled(secretUpdates);
-    const failed = results.filter(result => result.status === 'rejected');
-
-    if (failed.length > 0) {
-      console.error('Some secret updates failed:', failed);
+    if (validSecrets.length === 0) {
       return new Response(JSON.stringify({ 
-        error: 'Some secrets failed to update',
-        details: failed.map(f => f.reason)
+        error: 'No valid secrets provided',
       }), {
-        status: 500,
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: `${platform} secrets updated successfully`,
-      updated_count: secretUpdates.length
+      message: `${platform} secrets received and validated. Please update them manually in Supabase Edge Function Secrets.`,
+      updated_count: validSecrets.length,
+      secrets: validSecrets
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
