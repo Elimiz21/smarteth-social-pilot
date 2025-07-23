@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { TwitterCredentialsDialog } from "@/components/TwitterCredentialsDialog";
 import { TwitterTestButton } from "@/components/TwitterTestButton";
+import { CredentialsDialog } from "@/components/CredentialsDialog";
 
 // System-wide platform configurations
 const socialPlatformConfigs = [
@@ -209,15 +210,44 @@ export default function Integrations() {
                         <TwitterCredentialsDialog />
                         <TwitterTestButton />
                       </>
+                    ) : platform.id === 'linkedin' ? (
+                      <CredentialsDialog
+                        platformName="LinkedIn"
+                        fields={[
+                          { name: "LINKEDIN_CLIENT_ID", label: "Client ID", placeholder: "Enter LinkedIn Client ID" },
+                          { name: "LINKEDIN_CLIENT_SECRET", label: "Client Secret", placeholder: "Enter LinkedIn Client Secret", isSecret: true },
+                          { name: "LINKEDIN_ACCESS_TOKEN", label: "Access Token", placeholder: "Enter LinkedIn Access Token", isSecret: true }
+                        ]}
+                      />
+                    ) : platform.id === 'instagram' ? (
+                      <CredentialsDialog
+                        platformName="Instagram"
+                        fields={[
+                          { name: "INSTAGRAM_ACCESS_TOKEN", label: "Access Token", placeholder: "Enter Instagram Access Token", isSecret: true },
+                          { name: "INSTAGRAM_PAGE_ID", label: "Page ID", placeholder: "Enter Instagram Page ID" }
+                        ]}
+                      />
+                    ) : platform.id === 'telegram' ? (
+                      <CredentialsDialog
+                        platformName="Telegram"
+                        fields={[
+                          { name: "TELEGRAM_BOT_TOKEN", label: "Bot Token", placeholder: "Enter Telegram Bot Token", isSecret: true },
+                          { name: "TELEGRAM_CHAT_ID", label: "Chat ID", placeholder: "Enter Telegram Chat ID" }
+                        ]}
+                      />
+                    ) : platform.id === 'youtube' ? (
+                      <CredentialsDialog
+                        platformName="YouTube"
+                        fields={[
+                          { name: "YOUTUBE_CLIENT_ID", label: "Client ID", placeholder: "Enter YouTube Client ID" },
+                          { name: "YOUTUBE_CLIENT_SECRET", label: "Client Secret", placeholder: "Enter YouTube Client Secret", isSecret: true },
+                          { name: "YOUTUBE_REFRESH_TOKEN", label: "Refresh Token", placeholder: "Enter YouTube Refresh Token", isSecret: true }
+                        ]}
+                      />
                     ) : (
-                      <>
-                        <Button variant="outline" size="sm" disabled>
-                          Edit Credentials
-                        </Button>
-                        <Button variant="outline" size="sm" disabled>
-                          Test Connection
-                        </Button>
-                      </>
+                      <Button variant="outline" size="sm" disabled>
+                        Edit Credentials
+                      </Button>
                     )}
                   </div>
                 </CardContent>
@@ -259,12 +289,12 @@ export default function Integrations() {
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </a>
                     </Button>
-                    <Button variant="outline" size="sm" disabled>
-                      Edit Credentials
-                    </Button>
-                    <Button variant="outline" size="sm" disabled>
-                      Test Connection
-                    </Button>
+                    <CredentialsDialog
+                      platformName={service.name}
+                      fields={[
+                        { name: service.secretName, label: "API Key", placeholder: `Enter ${service.name} API Key`, isSecret: true }
+                      ]}
+                    />
                   </div>
                 </CardContent>
               </Card>
