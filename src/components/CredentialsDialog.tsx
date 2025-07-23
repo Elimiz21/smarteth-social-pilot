@@ -37,7 +37,7 @@ export const CredentialsDialog = ({ platformName, fields, triggerLabel = "Edit C
 
   const handleUpdateCredentials = async () => {
     // Check if all required fields are filled
-    const missingFields = fields.filter(field => !credentials[field.name]);
+    const missingFields = fields.filter(field => !credentials[field.name] || credentials[field.name].trim() === "");
     if (missingFields.length > 0) {
       toast({
         title: "Missing Credentials",
@@ -60,75 +60,31 @@ export const CredentialsDialog = ({ platformName, fields, triggerLabel = "Edit C
       }
     }
 
-    setIsUpdating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('update-platform-secrets', {
-        body: {
-          platform: platformName.toLowerCase(),
-          secrets: credentials
-        }
-      });
+    // Show instructions for manual update
+    toast({
+      title: "Manual Update Required",
+      description: `The credentials you entered are valid. Please manually add them to Supabase Edge Function Secrets using the "Manage Secrets" button.`,
+    });
 
-      if (error) {
-        console.error(`Error updating ${platformName} credentials:`, error);
-        toast({
-          title: "Update Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else if (data?.success) {
-        toast({
-          title: "Credentials Updated!",
-          description: `${platformName} credentials have been successfully updated. Testing connection...`,
-        });
-        
-        // Test the credentials immediately after update
-        setTimeout(async () => {
-          try {
-            const testResult = await supabase.functions.invoke('test-credentials', {
-              body: {
-                service: platformName.toLowerCase() === 'openai' ? 'openai' : platformName.toLowerCase(),
-                platform: ['twitter', 'linkedin', 'instagram', 'telegram', 'youtube'].includes(platformName.toLowerCase()) ? platformName.toLowerCase() : undefined
-              }
-            });
-            
-            if (testResult.data?.configured) {
-              toast({
-                title: "Connection Successful!",
-                description: `${platformName} credentials are working correctly.`,
-              });
-            } else {
-              toast({
-                title: "Connection Failed",
-                description: `${platformName} credentials were saved but connection test failed: ${testResult.data?.error || 'Invalid credentials'}`,
-                variant: "destructive",
-              });
-            }
-          } catch (testError) {
-            console.error('Error testing credentials:', testError);
-          }
-        }, 1000);
-        
-        setIsOpen(false);
-        // Clear form
-        setCredentials({});
-      } else {
-        toast({
-          title: "Update Failed",
-          description: data?.error || "Unknown error",
-          variant: "destructive",
-        });
-      }
-    } catch (err: any) {
-      console.error('Error:', err);
+    // Show the secrets that need to be updated
+    const secretsList = fields.map(field => field.name).join(", ");
+    setTimeout(() => {
       toast({
-        title: "Update Error",
-        description: err.message || "An unexpected error occurred",
-        variant: "destructive",
+        title: "Secrets to Update",
+        description: `Update these secrets in Supabase: ${secretsList}`,
       });
-    } finally {
-      setIsUpdating(false);
-    }
+    }, 2000);
+
+    setTimeout(() => {
+      toast({
+        title: "Next Steps",
+        description: "1. Click 'Manage Secrets' 2. Find the secret name 3. Paste your API key 4. Save 5. Test again",
+      });
+    }, 4000);
+
+    setIsOpen(false);
+    // Clear form for security
+    setCredentials({});
   };
 
   return (
