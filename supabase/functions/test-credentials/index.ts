@@ -89,12 +89,11 @@ serve(async (req) => {
             const accessTokenSecret = await getSecret('TWITTER_ACCESS_TOKEN_SECRET');
             
             if (consumerKey && consumerSecret && accessToken && accessTokenSecret) {
-              // Test Twitter API by verifying credentials
-              const testResponse = await supabaseClient.functions.invoke('test-twitter-auth');
-              testResult.configured = testResponse.data?.success === true;
-              if (!testResult.configured) {
-                testResult.error = testResponse.data?.error || testResponse.error?.message;
-              }
+              // For Twitter, just check if credentials exist due to rate limiting
+              testResult.configured = true;
+              testResult.error = null;
+            } else {
+              testResult.error = 'Missing Twitter credentials';
             }
             break;
           }
