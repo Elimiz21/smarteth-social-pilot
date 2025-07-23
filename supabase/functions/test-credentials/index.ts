@@ -140,6 +140,8 @@ serve(async (req) => {
           case 'openai': {
             const apiKey = getSecret('OPENAI_API_KEY');
             
+            console.log('Testing OpenAI with API key:', apiKey ? `${apiKey.substring(0, 10)}...` : 'null');
+            
             if (apiKey) {
               try {
                 const response = await fetch('https://api.openai.com/v1/models', {
@@ -147,13 +149,22 @@ serve(async (req) => {
                     'Authorization': `Bearer ${apiKey}`,
                   },
                 });
-                testResult.configured = response.ok;
-                if (!testResult.configured) {
-                  testResult.error = `OpenAI API error: ${response.status}`;
+                
+                console.log('OpenAI response status:', response.status);
+                
+                if (response.ok) {
+                  testResult.configured = true;
+                } else {
+                  const errorText = await response.text();
+                  console.log('OpenAI error response:', errorText);
+                  testResult.error = `OpenAI API error: ${response.status} - ${errorText}`;
                 }
               } catch (error) {
+                console.error('OpenAI API connection error:', error);
                 testResult.error = 'Failed to connect to OpenAI API';
               }
+            } else {
+              testResult.error = 'OPENAI_API_KEY not found in secrets';
             }
             break;
           }
