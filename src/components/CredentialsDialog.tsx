@@ -47,6 +47,19 @@ export const CredentialsDialog = ({ platformName, fields, triggerLabel = "Edit C
       return;
     }
 
+    // Validate OpenAI API key format
+    if (platformName.toLowerCase() === 'openai' && credentials.OPENAI_API_KEY) {
+      const apiKey = credentials.OPENAI_API_KEY.trim();
+      if (!apiKey.startsWith('sk-') || apiKey.length < 48) {
+        toast({
+          title: "Invalid API Key Format",
+          description: "OpenAI API keys should start with 'sk-' and be at least 48 characters long. Please check your API key.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setIsUpdating(true);
     try {
       const { data, error } = await supabase.functions.invoke('update-platform-secrets', {
@@ -66,8 +79,35 @@ export const CredentialsDialog = ({ platformName, fields, triggerLabel = "Edit C
       } else if (data?.success) {
         toast({
           title: "Credentials Updated!",
-          description: `${platformName} credentials have been successfully updated`,
+          description: `${platformName} credentials have been successfully updated. Testing connection...`,
         });
+        
+        // Test the credentials immediately after update
+        setTimeout(async () => {
+          try {
+            const testResult = await supabase.functions.invoke('test-credentials', {
+              body: {
+                service: platformName.toLowerCase()
+              }
+            });
+            
+            if (testResult.data?.configured) {
+              toast({
+                title: "Connection Successful!",
+                description: `${platformName} credentials are working correctly.`,
+              });
+            } else {
+              toast({
+                title: "Connection Failed",
+                description: `${platformName} credentials were saved but connection test failed: ${testResult.data?.error || 'Invalid credentials'}`,
+                variant: "destructive",
+              });
+            }
+          } catch (testError) {
+            console.error('Error testing credentials:', testError);
+          }
+        }, 1000);
+        
         setIsOpen(false);
         // Clear form
         setCredentials({});
