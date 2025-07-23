@@ -70,7 +70,7 @@ serve(async (req) => {
       return Deno.env.get(name);
     };
 
-    let testResult = { configured: false, error: null };
+    let testResult: { configured: boolean; error: string | null } = { configured: false, error: null };
 
     try {
       if (platform) {
