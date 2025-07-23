@@ -60,31 +60,48 @@ export const CredentialsDialog = ({ platformName, fields, triggerLabel = "Edit C
       }
     }
 
-    // Show instructions for manual update
-    toast({
-      title: "Manual Update Required",
-      description: `The credentials you entered are valid. Please manually add them to Supabase Edge Function Secrets using the "Manage Secrets" button.`,
-    });
-
-    // Show the secrets that need to be updated
-    const secretsList = fields.map(field => field.name).join(", ");
-    setTimeout(() => {
-      toast({
-        title: "Secrets to Update",
-        description: `Update these secrets in Supabase: ${secretsList}`,
+    setIsUpdating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('update-app-secrets', {
+        body: {
+          platform: platformName.toLowerCase(),
+          secrets: credentials
+        }
       });
-    }, 2000);
 
-    setTimeout(() => {
+      if (error) {
+        console.error(`Error updating ${platformName} credentials:`, error);
+        toast({
+          title: "Update Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else if (data?.success) {
+        toast({
+          title: "Credentials Updated!",
+          description: `${platformName} credentials have been successfully updated in the system.`,
+        });
+        
+        setIsOpen(false);
+        // Clear form for security
+        setCredentials({});
+      } else {
+        toast({
+          title: "Update Failed",
+          description: data?.error || "Unknown error occurred",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      console.error('Error:', err);
       toast({
-        title: "Next Steps",
-        description: "1. Click 'Manage Secrets' 2. Find the secret name 3. Paste your API key 4. Save 5. Test again",
+        title: "Update Error",
+        description: err.message || "An unexpected error occurred",
+        variant: "destructive",
       });
-    }, 4000);
-
-    setIsOpen(false);
-    // Clear form for security
-    setCredentials({});
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   return (
