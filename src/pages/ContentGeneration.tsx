@@ -220,6 +220,9 @@ Please create content that aligns with this strategy and resonates with our targ
       setGeneratedVersions(data.generatedContent || []);
     } catch (error) {
       console.error('Error generating content:', error);
+      // Show error message to user
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate content';
+      alert(`Error generating content: ${errorMessage}`);
     } finally {
       setIsGenerating(false);
     }
