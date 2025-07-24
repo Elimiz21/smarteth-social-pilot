@@ -75,6 +75,16 @@ Return the response as a JSON array with 3 objects, each containing:
     });
 
     const data = await response.json();
+    console.log('OpenAI API response:', data);
+    
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
+    }
+
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('Invalid response format from OpenAI API');
+    }
+
     let generatedContent;
 
     try {
