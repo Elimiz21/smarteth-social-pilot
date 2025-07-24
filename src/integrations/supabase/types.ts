@@ -181,6 +181,51 @@ export type Database = {
         }
         Relationships: []
       }
+      strategies: {
+        Row: {
+          content_themes: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          key_messaging: string | null
+          metrics: Json | null
+          name: string
+          objectives: Json | null
+          target_audience: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content_themes?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_messaging?: string | null
+          metrics?: Json | null
+          name: string
+          objectives?: Json | null
+          target_audience?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content_themes?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_messaging?: string | null
+          metrics?: Json | null
+          name?: string
+          objectives?: Json | null
+          target_audience?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
