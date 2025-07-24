@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ContentLibrary, type GeneratedContent } from "@/components/content/ContentLibrary";
 import { WeeklyContentPlanner, type WeeklyContentPlan } from "@/components/content/WeeklyContentPlanner";
+import { AISettingsDialog } from "@/components/content/AISettingsDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { 
   Sparkles, 
   RefreshCw, 
@@ -42,6 +45,9 @@ const contentTypes = [
 ];
 
 export default function ContentGeneration() {
+  const { user } = useAuth();
+  const [strategies, setStrategies] = useState<any[]>([]);
+  const [activeStrategy, setActiveStrategy] = useState<any>(null);
   const [generatedContents, setGeneratedContents] = useState<GeneratedContent[]>([
     {
       id: "1",
@@ -70,6 +76,47 @@ export default function ContentGeneration() {
   ]);
 
   const [weeklyPlans, setWeeklyPlans] = useState<WeeklyContentPlan[]>([]);
+
+  useEffect(() => {
+    const fetchStrategies = async () => {
+      if (!user?.id) return;
+      
+      const { data } = await supabase
+        .from('strategies')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (data) {
+        setStrategies(data);
+        const active = data.find(s => s.is_active) || data[0];
+        setActiveStrategy(active);
+      }
+    };
+
+    fetchStrategies();
+  }, [user?.id]);
+
+  const buildStrategyPrompt = () => {
+    if (!activeStrategy) return "";
+    
+    return `
+Context: You are creating content for ${activeStrategy.name || 'our marketing strategy'}.
+
+Strategy Overview:
+${activeStrategy.description || ''}
+
+Target Audience: ${activeStrategy.target_audience || ''}
+
+Key Messaging: ${activeStrategy.key_messaging || ''}
+
+Content Themes: ${activeStrategy.content_themes || ''}
+
+Objectives: ${activeStrategy.objectives?.map((obj: any) => `- ${obj.text}`).join('\n') || ''}
+
+Please create content that aligns with this strategy and resonates with our target audience.
+    `.trim();
+  };
 
   const handleCreatePlan = (plan: Omit<WeeklyContentPlan, 'id'>) => {
     const newPlan = { ...plan, id: Date.now().toString() };
@@ -127,10 +174,12 @@ export default function ContentGeneration() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline">
-            <Settings className="w-4 h-4 mr-2" />
-            AI Settings
-          </Button>
+          <AISettingsDialog>
+            <Button variant="outline">
+              <Settings className="w-4 h-4 mr-2" />
+              AI Settings
+            </Button>
+          </AISettingsDialog>
           <Button variant="hero">
             <Sparkles className="w-4 h-4 mr-2" />
             Generate Content
@@ -210,15 +259,23 @@ export default function ContentGeneration() {
             {/* Target Audience */}
             <div className="space-y-2">
               <Label>Target Audience</Label>
-              <Select defaultValue="investors">
+              <Select defaultValue={activeStrategy?.target_audience?.toLowerCase() || "investors"}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="investors">Institutional Investors</SelectItem>
-                  <SelectItem value="retail">Retail Crypto Holders</SelectItem>
-                  <SelectItem value="traders">Professional Traders</SelectItem>
-                  <SelectItem value="general">General Public</SelectItem>
+                  {activeStrategy?.target_audience ? (
+                    <SelectItem value={activeStrategy.target_audience.toLowerCase()}>
+                      {activeStrategy.target_audience}
+                    </SelectItem>
+                  ) : (
+                    <>
+                      <SelectItem value="investors">Institutional Investors</SelectItem>
+                      <SelectItem value="retail">Retail Crypto Holders</SelectItem>
+                      <SelectItem value="traders">Professional Traders</SelectItem>
+                      <SelectItem value="general">General Public</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -267,14 +324,16 @@ export default function ContentGeneration() {
               </TabsList>
 
               <TabsContent value="prompt" className="space-y-4">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Content Role/Context</Label>
-                    <Textarea 
-                      placeholder="You are an expert crypto marketing strategist for SmartEth, a regulated Israeli asset management firm raising $50M for innovative ETH strategies..."
-                      className="min-h-[120px]"
-                    />
-                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Content Role/Context</Label>
+                      <Textarea 
+                        placeholder="You are an expert crypto marketing strategist for SmartEth, a regulated Israeli asset management firm raising $50M for innovative ETH strategies..."
+                        value={buildStrategyPrompt()}
+                        className="min-h-[120px]"
+                        readOnly
+                      />
+                    </div>
                   <div className="space-y-2">
                     <Label>Specific Requirements</Label>
                     <Textarea 
