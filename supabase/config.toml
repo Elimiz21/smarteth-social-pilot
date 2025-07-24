@@ -24,14 +24,14 @@ smtp_port = 54325
 pop3_port = 54326
 
 [storage]
+[storage.image_transformation]
+enabled = true                       # or false if you prefer
 enabled = true
-port = 54327
 file_size_limit = "50MiB"
-image_transformation = true
+
 
 [edge_runtime]
 enabled = true
-port = 54328
 
 [functions.analytics]
 
