@@ -13,26 +13,25 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client with user authentication
+    // Initialize Supabase client with service role for app secrets access
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get authentication token
+    // Get authentication token for user verification
     const authHeader = req.headers.get('Authorization')?.replace('Bearer ', '');
     if (!authHeader) {
       throw new Error('Authorization token required');
     }
 
-    // Set the auth token for the client
-    await supabaseClient.auth.setSession({
-      access_token: authHeader,
-      refresh_token: ''
-    });
-
-    // Verify user
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    // Verify user with a separate client
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+    
+    const { data: { user }, error: authError } = await userClient.auth.getUser(authHeader);
     if (authError || !user) {
       console.error('Auth error:', authError);
       throw new Error('Invalid authentication token');
