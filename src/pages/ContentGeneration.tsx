@@ -176,6 +176,29 @@ Please create content that aligns with this strategy and resonates with our targ
     );
   };
 
+  const handleApproveGenerated = (index: number) => {
+    const version = generatedVersions[index];
+    if (!version) return;
+
+    const newContent: GeneratedContent = {
+      id: Date.now().toString() + index,
+      content: version.content,
+      type: selectedContentType as any,
+      audience: selectedAudience,
+      tone: selectedTone,
+      platforms: contentTypes.find(t => t.id === selectedContentType)?.platforms || [],
+      keywords: keywords.split(',').map(k => k.trim()).filter(Boolean),
+      engagementScore: version.engagementScore || 8.5,
+      createdAt: new Date(),
+      status: "approved"
+    };
+
+    setGeneratedContents(prev => [...prev, newContent]);
+    
+    // Remove from generated versions after approval
+    setGeneratedVersions(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleGenerateContent = async () => {
     setIsGenerating(true);
     try {
@@ -466,7 +489,13 @@ Please create content that aligns with this strategy and resonates with our targ
                             </div>
                             <div className="flex gap-2">
                               <Button size="sm" variant="outline">Edit</Button>
-                              <Button size="sm" variant="default">Approve</Button>
+                              <Button 
+                                size="sm" 
+                                variant="default"
+                                onClick={() => handleApproveGenerated(index)}
+                              >
+                                Approve
+                              </Button>
                             </div>
                           </div>
                         </CardContent>
