@@ -48,6 +48,7 @@ export default function ContentGeneration() {
   const { user } = useAuth();
   const [strategies, setStrategies] = useState<any[]>([]);
   const [activeStrategy, setActiveStrategy] = useState<any>(null);
+  const [contentPrompt, setContentPrompt] = useState("");
   const [generatedContents, setGeneratedContents] = useState<GeneratedContent[]>([
     {
       id: "1",
@@ -91,28 +92,30 @@ export default function ContentGeneration() {
         setStrategies(data);
         const active = data.find(s => s.is_active) || data[0];
         setActiveStrategy(active);
+        setContentPrompt(buildStrategyPrompt(active));
       }
     };
 
     fetchStrategies();
   }, [user?.id]);
 
-  const buildStrategyPrompt = () => {
-    if (!activeStrategy) return "";
+  const buildStrategyPrompt = (strategy = activeStrategy) => {
+    if (!strategy) return "";
     
     return `
-Context: You are creating content for ${activeStrategy.name || 'our marketing strategy'}.
+Context: You are creating content for ${strategy.name || 'our marketing strategy'}.
 
 Strategy Overview:
-${activeStrategy.description || ''}
+Strategy Overview:
+${strategy.description || ''}
 
-Target Audience: ${activeStrategy.target_audience || ''}
+Target Audience: ${strategy.target_audience || ''}
 
-Key Messaging: ${activeStrategy.key_messaging || ''}
+Key Messaging: ${strategy.key_messaging || ''}
 
-Content Themes: ${activeStrategy.content_themes || ''}
+Content Themes: ${strategy.content_themes || ''}
 
-Objectives: ${activeStrategy.objectives?.map((obj: any) => `- ${obj.text}`).join('\n') || ''}
+Objectives: ${strategy.objectives?.map((obj: any) => `- ${obj.text}`).join('\n') || ''}
 
 Please create content that aligns with this strategy and resonates with our target audience.
     `.trim();
@@ -329,9 +332,9 @@ Please create content that aligns with this strategy and resonates with our targ
                       <Label>Content Role/Context</Label>
                       <Textarea 
                         placeholder="You are an expert crypto marketing strategist for SmartEth, a regulated Israeli asset management firm raising $50M for innovative ETH strategies..."
-                        value={buildStrategyPrompt()}
+                        value={contentPrompt}
+                        onChange={(e) => setContentPrompt(e.target.value)}
                         className="min-h-[120px]"
-                        readOnly
                       />
                     </div>
                   <div className="space-y-2">
