@@ -32,14 +32,18 @@ serve(async (req) => {
     }
 
     // Get OpenAI API key from database
+    console.log('Fetching OpenAI API key from app_secrets table...');
     const { data: secretData, error: secretError } = await supabaseClient
       .from('app_secrets')
       .select('value')
       .eq('name', 'OPENAI_API_KEY')
       .single();
 
+    console.log('Secret query result:', { secretData, secretError });
+
     if (secretError || !secretData?.value) {
-      throw new Error('OpenAI API key not configured. Please set it in your integrations.');
+      console.error('Failed to get OpenAI API key:', secretError);
+      throw new Error(`OpenAI API key not configured. Error: ${secretError?.message || 'No value found'}`);
     }
 
     const openAIApiKey = secretData.value;
