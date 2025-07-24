@@ -26,7 +26,6 @@ pop3_port = 54326
 [storage]
 [storage.image_transformation]
 enabled = true                       # or false if you prefer
-enabled = true
 file_size_limit = "50MiB"
 
 
