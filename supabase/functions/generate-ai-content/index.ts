@@ -1,9 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-console.log('OpenAI API Key status:', openAIApiKey ? 'Found' : 'Not found');
-console.log('API Key prefix:', openAIApiKey ? openAIApiKey.substring(0, 10) + '...' : 'N/A');
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,6 +13,38 @@ serve(async (req) => {
   }
 
   try {
+    // Initialize Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Get authentication token
+    const authHeader = req.headers.get('Authorization')?.replace('Bearer ', '');
+    if (!authHeader) {
+      throw new Error('Authorization token required');
+    }
+
+    // Verify user
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(authHeader);
+    if (authError || !user) {
+      throw new Error('Invalid authentication token');
+    }
+
+    // Get OpenAI API key from database
+    const { data: secretData, error: secretError } = await supabaseClient
+      .from('app_secrets')
+      .select('value')
+      .eq('name', 'OPENAI_API_KEY')
+      .single();
+
+    if (secretError || !secretData?.value) {
+      throw new Error('OpenAI API key not configured. Please set it in your integrations.');
+    }
+
+    const openAIApiKey = secretData.value;
+    console.log('OpenAI API Key status:', openAIApiKey ? 'Found in database' : 'Not found');
+    console.log('API Key prefix:', openAIApiKey ? openAIApiKey.substring(0, 10) + '...' : 'N/A');
     const { 
       contentPrompt, 
       contentType, 
