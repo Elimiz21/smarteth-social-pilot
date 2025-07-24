@@ -49,6 +49,15 @@ export default function ContentGeneration() {
   const [strategies, setStrategies] = useState<any[]>([]);
   const [activeStrategy, setActiveStrategy] = useState<any>(null);
   const [contentPrompt, setContentPrompt] = useState("");
+  const [selectedContentType, setSelectedContentType] = useState("tweet");
+  const [selectedAudience, setSelectedAudience] = useState("");
+  const [selectedTone, setSelectedTone] = useState("professional");
+  const [keywords, setKeywords] = useState("");
+  const [specificRequirements, setSpecificRequirements] = useState("");
+  const [complianceGuidelines, setComplianceGuidelines] = useState("");
+  const [callToAction, setCallToAction] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedVersions, setGeneratedVersions] = useState<any[]>([]);
   const [generatedContents, setGeneratedContents] = useState<GeneratedContent[]>([
     {
       id: "1",
@@ -93,6 +102,9 @@ export default function ContentGeneration() {
         const active = data.find(s => s.is_active) || data[0];
         setActiveStrategy(active);
         setContentPrompt(buildStrategyPrompt(active));
+        if (active?.target_audience) {
+          setSelectedAudience(active.target_audience.split(',')[0]?.trim().toLowerCase() || "");
+        }
       }
     };
 
@@ -162,6 +174,32 @@ Please create content that aligns with this strategy and resonates with our targ
     setGeneratedContents(prev => 
       prev.map(c => c.id === id ? { ...c, status: "approved" as const } : c)
     );
+  };
+
+  const handleGenerateContent = async () => {
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-ai-content', {
+        body: {
+          contentPrompt,
+          contentType: selectedContentType,
+          targetAudience: selectedAudience,
+          tone: selectedTone,
+          keywords,
+          specificRequirements,
+          complianceGuidelines,
+          callToAction
+        }
+      });
+
+      if (error) throw error;
+
+      setGeneratedVersions(data.generatedContent || []);
+    } catch (error) {
+      console.error('Error generating content:', error);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -245,7 +283,7 @@ Please create content that aligns with this strategy and resonates with our targ
             {/* Content Type */}
             <div className="space-y-2">
               <Label>Content Type</Label>
-              <Select defaultValue="tweet">
+              <Select value={selectedContentType} onValueChange={setSelectedContentType}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -262,15 +300,17 @@ Please create content that aligns with this strategy and resonates with our targ
             {/* Target Audience */}
             <div className="space-y-2">
               <Label>Target Audience</Label>
-              <Select defaultValue={activeStrategy?.target_audience?.toLowerCase() || "investors"}>
+              <Select value={selectedAudience} onValueChange={setSelectedAudience}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {activeStrategy?.target_audience ? (
-                    <SelectItem value={activeStrategy.target_audience.toLowerCase()}>
-                      {activeStrategy.target_audience}
-                    </SelectItem>
+                    activeStrategy.target_audience.split(',').map((audience: string, index: number) => (
+                      <SelectItem key={index} value={audience.trim().toLowerCase()}>
+                        {audience.trim()}
+                      </SelectItem>
+                    ))
                   ) : (
                     <>
                       <SelectItem value="investors">Institutional Investors</SelectItem>
@@ -286,7 +326,7 @@ Please create content that aligns with this strategy and resonates with our targ
             {/* Tone */}
             <div className="space-y-2">
               <Label>Tone & Style</Label>
-              <Select defaultValue="professional">
+              <Select value={selectedTone} onValueChange={setSelectedTone}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -302,7 +342,11 @@ Please create content that aligns with this strategy and resonates with our targ
             {/* Topic/Keywords */}
             <div className="space-y-2">
               <Label>Keywords/Topics</Label>
-              <Input placeholder="SmartEth, DeFi, Asset Management..." />
+              <Input 
+                placeholder="SmartEth, DeFi, Asset Management..." 
+                value={keywords}
+                onChange={(e) => setKeywords(e.target.value)}
+              />
             </div>
           </CardContent>
         </Card>
@@ -341,6 +385,8 @@ Please create content that aligns with this strategy and resonates with our targ
                     <Label>Specific Requirements</Label>
                     <Textarea 
                       placeholder="Create content that emphasizes regulatory compliance, institutional credibility, innovative technology, proven track record..."
+                      value={specificRequirements}
+                      onChange={(e) => setSpecificRequirements(e.target.value)}
                       className="min-h-[120px]"
                     />
                   </div>
@@ -348,19 +394,30 @@ Please create content that aligns with this strategy and resonates with our targ
                     <Label>Compliance Guidelines</Label>
                     <Textarea 
                       placeholder="Include required disclaimers, avoid promotional language, focus on factual information, emphasize risk disclosures..."
+                      value={complianceGuidelines}
+                      onChange={(e) => setComplianceGuidelines(e.target.value)}
                       className="min-h-[120px]"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Call-to-Action</Label>
-                    <Input placeholder="Learn more at smarteth.com | Contact for institutional inquiries" />
+                    <Input 
+                      placeholder="Learn more at smarteth.com | Contact for institutional inquiries" 
+                      value={callToAction}
+                      onChange={(e) => setCallToAction(e.target.value)}
+                    />
                   </div>
                 </div>
 
                 <div className="flex gap-3">
-                  <Button variant="hero" className="flex-1">
+                  <Button 
+                    variant="hero" 
+                    className="flex-1" 
+                    onClick={handleGenerateContent}
+                    disabled={isGenerating}
+                  >
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Generate 3 Versions
+                    {isGenerating ? "Generating..." : "Generate 3 Versions"}
                   </Button>
                   <Button variant="outline">
                     <RefreshCw className="w-4 h-4" />
@@ -370,45 +427,57 @@ Please create content that aligns with this strategy and resonates with our targ
 
               <TabsContent value="generated" className="space-y-4">
                 <div className="space-y-4">
-                  {[1, 2, 3].map((version) => (
-                    <Card key={version} className="border border-accent/20">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-base">Version {version}</CardTitle>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs">
-                              <BarChart3 className="w-3 h-3 mr-1" />
-                              Engagement: 8.5/10
-                            </Badge>
-                            <Button variant="ghost" size="icon-sm">
-                              <Copy className="w-3 h-3" />
-                            </Button>
-                            <Button variant="ghost" size="icon-sm">
-                              <Edit className="w-3 h-3" />
-                            </Button>
+                  {generatedVersions.length > 0 ? (
+                    generatedVersions.map((version, index) => (
+                      <Card key={index} className="border border-accent/20">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-base">Version {index + 1}</CardTitle>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                <BarChart3 className="w-3 h-3 mr-1" />
+                                Engagement: {version.engagementScore || 8.5}/10
+                              </Badge>
+                              <Button variant="ghost" size="icon-sm">
+                                <Copy className="w-3 h-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon-sm">
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm leading-relaxed">
-                          🚀 Smart ETH strategy update: Our regulated asset management approach continues to deliver exceptional results for institutional clients. With cutting-edge DeFi integration and institutional-grade security, we're redefining crypto investment standards. 
-                          
-                          #SmartETH #InstitutionalCrypto #DeFi #AssetManagement
-                          
-                          Learn more about our $50M fundraising at smarteth.com
-                        </p>
-                        <div className="flex justify-between items-center mt-4 pt-3 border-t">
-                          <div className="text-xs text-muted-foreground">
-                            Character count: 287/280 | Estimated reach: 2.5K
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                            {version.content}
+                          </p>
+                          {version.suggestedHashtags && (
+                            <div className="mt-3 flex flex-wrap gap-1">
+                              {version.suggestedHashtags.map((tag: string, tagIndex: number) => (
+                                <Badge key={tagIndex} variant="secondary" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center mt-4 pt-3 border-t">
+                            <div className="text-xs text-muted-foreground">
+                              Character count: {version.characterCount || version.content?.length || 0} | Estimated reach: 2.5K
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline">Edit</Button>
+                              <Button size="sm" variant="default">Approve</Button>
+                            </div>
                           </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline">Edit</Button>
-                            <Button size="sm" variant="success">Approve</Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>Generate content to see results here</p>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 
