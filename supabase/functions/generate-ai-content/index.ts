@@ -13,10 +13,10 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client
+    // Initialize Supabase client with user authentication
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
     // Get authentication token
@@ -25,11 +25,20 @@ serve(async (req) => {
       throw new Error('Authorization token required');
     }
 
+    // Set the auth token for the client
+    await supabaseClient.auth.setSession({
+      access_token: authHeader,
+      refresh_token: ''
+    });
+
     // Verify user
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(authHeader);
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
+      console.error('Auth error:', authError);
       throw new Error('Invalid authentication token');
     }
+
+    console.log('User authenticated:', user.id);
 
     // Get OpenAI API key from database
     console.log('Fetching OpenAI API key from app_secrets table...');
