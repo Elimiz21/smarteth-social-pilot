@@ -62,7 +62,7 @@ async function callPerplexity(apiKey: string, fullPrompt: string) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'llama-3.1-sonar-large-128k-online',
+      model: 'llama-3.1-sonar-small-128k-online',
       messages: [
         { 
           role: 'system', 
@@ -73,6 +73,8 @@ async function callPerplexity(apiKey: string, fullPrompt: string) {
       temperature: 0.2,
       top_p: 0.9,
       max_tokens: 2000,
+      return_images: false,
+      return_related_questions: false,
       frequency_penalty: 1,
       presence_penalty: 0
     }),
@@ -80,9 +82,10 @@ async function callPerplexity(apiKey: string, fullPrompt: string) {
 
   const data = await response.json();
   console.log('Perplexity API response status:', response.status);
+  console.log('Perplexity API response data:', JSON.stringify(data));
   
   if (!response.ok) {
-    throw new Error(`Perplexity API error: ${data.error?.message || 'Unknown error'}`);
+    throw new Error(`Perplexity API error: ${data.error?.message || data.message || 'Unknown error'}`);
   }
 
   return data;
