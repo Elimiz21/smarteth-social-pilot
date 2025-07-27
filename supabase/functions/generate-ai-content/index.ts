@@ -60,37 +60,45 @@ async function callOpenAI(apiKey: string, fullPrompt: string) {
 }
 
 async function callPerplexity(apiKey: string, fullPrompt: string) {
+  console.log('Calling Perplexity API...');
+  
+  const requestBody = {
+    model: 'llama-3.1-sonar-small-128k-online',
+    messages: [
+      { 
+        role: 'system', 
+        content: 'You are an expert content creator specializing in cryptocurrency and financial marketing. Generate engaging, compliant content that resonates with the target audience. Always return valid JSON array format.'
+      },
+      { role: 'user', content: fullPrompt }
+    ],
+    temperature: 0.2,
+    top_p: 0.9,
+    max_tokens: 2000,
+    return_images: false,
+    return_related_questions: false,
+    frequency_penalty: 1,
+    presence_penalty: 0
+  };
+
+  console.log('Perplexity request body:', JSON.stringify(requestBody, null, 2));
+
   const response = await fetch('https://api.perplexity.ai/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: 'llama-3.1-sonar-small-128k-online',
-      messages: [
-        { 
-          role: 'system', 
-          content: 'You are an expert content creator specializing in cryptocurrency and financial marketing. Generate engaging, compliant content that resonates with the target audience. Always return valid JSON array format.'
-        },
-        { role: 'user', content: fullPrompt }
-      ],
-      temperature: 0.2,
-      top_p: 0.9,
-      max_tokens: 2000,
-      return_images: false,
-      return_related_questions: false,
-      frequency_penalty: 1,
-      presence_penalty: 0
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   const data = await response.json();
   console.log('Perplexity API response status:', response.status);
-  console.log('Perplexity API response data:', JSON.stringify(data));
+  console.log('Perplexity API response data:', JSON.stringify(data, null, 2));
   
   if (!response.ok) {
-    throw new Error(`Perplexity API error: ${data.error?.message || data.message || 'Unknown error'}`);
+    const errorMsg = data.error?.message || data.message || data.detail || 'Unknown error';
+    console.error('Perplexity API error details:', data);
+    throw new Error(`Perplexity API error (${response.status}): ${errorMsg}`);
   }
 
   return data;
