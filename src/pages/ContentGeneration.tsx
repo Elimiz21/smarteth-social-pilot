@@ -237,6 +237,7 @@ Please create content that aligns with this strategy and resonates with our targ
 
       if (error) throw error;
 
+      console.log('Generated content response:', data);
       setGeneratedVersions(data.generatedContent || []);
     } catch (error) {
       console.error('Error generating content:', error);
