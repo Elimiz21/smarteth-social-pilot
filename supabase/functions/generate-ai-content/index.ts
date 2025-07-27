@@ -39,24 +39,24 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
-    // Get OpenAI API key from database
-    console.log('Fetching OpenAI API key from app_secrets table...');
+    // Get Perplexity API key from database
+    console.log('Fetching Perplexity API key from app_secrets table...');
     const { data: secretData, error: secretError } = await supabaseClient
       .from('app_secrets')
       .select('value')
-      .eq('name', 'OPENAI_API_KEY')
+      .eq('name', 'PERPLEXITY_API_KEY')
       .single();
 
     console.log('Secret query result:', { secretData, secretError });
 
     if (secretError || !secretData?.value) {
-      console.error('Failed to get OpenAI API key:', secretError);
-      throw new Error(`OpenAI API key not configured. Error: ${secretError?.message || 'No value found'}`);
+      console.error('Failed to get Perplexity API key:', secretError);
+      throw new Error(`Perplexity API key not configured. Error: ${secretError?.message || 'No value found'}`);
     }
 
-    const openAIApiKey = secretData.value;
-    console.log('OpenAI API Key status:', openAIApiKey ? 'Found in database' : 'Not found');
-    console.log('API Key prefix:', openAIApiKey ? openAIApiKey.substring(0, 10) + '...' : 'N/A');
+    const perplexityApiKey = secretData.value;
+    console.log('Perplexity API Key status:', perplexityApiKey ? 'Found in database' : 'Not found');
+    console.log('API Key prefix:', perplexityApiKey ? perplexityApiKey.substring(0, 10) + '...' : 'N/A');
     const { 
       contentPrompt, 
       contentType, 
@@ -98,14 +98,14 @@ Return the response as a JSON array with 3 objects, each containing:
 - suggestedHashtags: array of relevant hashtags
 `;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        'Authorization': `Bearer ${perplexityApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: 'llama-3.1-sonar-large-128k-online',
         messages: [
           { 
             role: 'system', 
@@ -113,19 +113,23 @@ Return the response as a JSON array with 3 objects, each containing:
           },
           { role: 'user', content: fullPrompt }
         ],
-        temperature: 0.8,
+        temperature: 0.2,
+        top_p: 0.9,
+        max_tokens: 2000,
+        frequency_penalty: 1,
+        presence_penalty: 0
       }),
     });
 
     const data = await response.json();
-    console.log('OpenAI API response:', data);
+    console.log('Perplexity API response:', data);
     
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
+      throw new Error(`Perplexity API error: ${data.error?.message || 'Unknown error'}`);
     }
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      throw new Error('Invalid response format from OpenAI API');
+      throw new Error('Invalid response format from Perplexity API');
     }
 
     let generatedContent;
