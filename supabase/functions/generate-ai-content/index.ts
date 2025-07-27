@@ -13,11 +13,16 @@ async function getApiKey(supabaseClient: any, keyName: string) {
     .from('app_secrets')
     .select('value')
     .eq('name', keyName)
-    .single();
+    .maybeSingle();
 
-  if (error || !data?.value) {
-    console.error(`Failed to get ${keyName}:`, error);
-    throw new Error(`${keyName} not configured. Please add this API key in your Supabase secrets. Error: ${error?.message || 'No value found'}`);
+  if (error) {
+    console.error(`Database error getting ${keyName}:`, error);
+    throw new Error(`Database error fetching ${keyName}: ${error.message}`);
+  }
+
+  if (!data?.value) {
+    console.error(`${keyName} not found or has no value`);
+    throw new Error(`${keyName} not configured. Please add this API key in your Supabase secrets.`);
   }
 
   console.log(`Successfully retrieved ${keyName}`);
