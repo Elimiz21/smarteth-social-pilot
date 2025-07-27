@@ -28,7 +28,7 @@ import {
   Brain
 } from "lucide-react";
 
-const aiProviders = [
+const defaultAiProviders = [
   { id: "openai", name: "OpenAI GPT-4", recommended: true },
   { id: "claude", name: "Anthropic Claude", recommended: true },
   { id: "gemini", name: "Google Gemini" },
@@ -49,6 +49,7 @@ export default function ContentGeneration() {
   const [strategies, setStrategies] = useState<any[]>([]);
   const [activeStrategy, setActiveStrategy] = useState<any>(null);
   const [selectedAiProvider, setSelectedAiProvider] = useState("openai");
+  const [availableProviders, setAvailableProviders] = useState(defaultAiProviders);
   const [contentPrompt, setContentPrompt] = useState("");
   const [selectedContentType, setSelectedContentType] = useState("tweet");
   const [selectedAudience, setSelectedAudience] = useState("");
@@ -109,7 +110,24 @@ export default function ContentGeneration() {
       }
     };
 
+    const fetchAvailableProviders = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('check-ai-providers');
+        if (error) throw error;
+        
+        if (data.availableProviders && data.availableProviders.length > 0) {
+          setAvailableProviders(data.availableProviders);
+          // Set default to first available provider
+          setSelectedAiProvider(data.availableProviders[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching available providers:', error);
+        // Keep using default providers if the check fails
+      }
+    };
+
     fetchStrategies();
+    fetchAvailableProviders();
   }, [user?.id]);
 
   const buildStrategyPrompt = (strategy = activeStrategy) => {
@@ -294,7 +312,7 @@ Please create content that aligns with this strategy and resonates with our targ
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {aiProviders.map((provider) => (
+                  {availableProviders.map((provider) => (
                     <SelectItem key={provider.id} value={provider.id}>
                       <div className="flex items-center gap-2">
                         {provider.name}

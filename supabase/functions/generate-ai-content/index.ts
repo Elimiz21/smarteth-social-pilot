@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 
 async function getApiKey(supabaseClient: any, keyName: string) {
+  console.log(`Attempting to fetch API key: ${keyName}`);
   const { data, error } = await supabaseClient
     .from('app_secrets')
     .select('value')
@@ -15,9 +16,11 @@ async function getApiKey(supabaseClient: any, keyName: string) {
     .single();
 
   if (error || !data?.value) {
-    throw new Error(`${keyName} not configured. Error: ${error?.message || 'No value found'}`);
+    console.error(`Failed to get ${keyName}:`, error);
+    throw new Error(`${keyName} not configured. Please add this API key in your Supabase secrets. Error: ${error?.message || 'No value found'}`);
   }
 
+  console.log(`Successfully retrieved ${keyName}`);
   return data.value;
 }
 
