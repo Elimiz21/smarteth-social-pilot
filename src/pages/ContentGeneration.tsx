@@ -48,7 +48,7 @@ export default function ContentGeneration() {
   const { user } = useAuth();
   const [strategies, setStrategies] = useState<any[]>([]);
   const [activeStrategy, setActiveStrategy] = useState<any>(null);
-  const [selectedAiProvider, setSelectedAiProvider] = useState("openai");
+  const [selectedAiProvider, setSelectedAiProvider] = useState("perplexity");
   const [availableProviders, setAvailableProviders] = useState(defaultAiProviders);
   const [contentPrompt, setContentPrompt] = useState("");
   const [selectedContentType, setSelectedContentType] = useState("tweet");
