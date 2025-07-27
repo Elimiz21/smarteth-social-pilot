@@ -48,6 +48,7 @@ export default function ContentGeneration() {
   const { user } = useAuth();
   const [strategies, setStrategies] = useState<any[]>([]);
   const [activeStrategy, setActiveStrategy] = useState<any>(null);
+  const [selectedAiProvider, setSelectedAiProvider] = useState("openai");
   const [contentPrompt, setContentPrompt] = useState("");
   const [selectedContentType, setSelectedContentType] = useState("tweet");
   const [selectedAudience, setSelectedAudience] = useState("");
@@ -204,6 +205,7 @@ Please create content that aligns with this strategy and resonates with our targ
     try {
       const { data, error } = await supabase.functions.invoke('generate-ai-content', {
         body: {
+          aiProvider: selectedAiProvider,
           contentPrompt,
           contentType: selectedContentType,
           targetAudience: selectedAudience,
@@ -287,7 +289,7 @@ Please create content that aligns with this strategy and resonates with our targ
             {/* AI Provider */}
             <div className="space-y-2">
               <Label>AI Provider</Label>
-              <Select defaultValue="openai">
+              <Select value={selectedAiProvider} onValueChange={setSelectedAiProvider}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

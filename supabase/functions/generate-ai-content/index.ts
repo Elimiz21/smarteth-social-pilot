@@ -7,6 +7,122 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+async function getApiKey(supabaseClient: any, keyName: string) {
+  const { data, error } = await supabaseClient
+    .from('app_secrets')
+    .select('value')
+    .eq('name', keyName)
+    .single();
+
+  if (error || !data?.value) {
+    throw new Error(`${keyName} not configured. Error: ${error?.message || 'No value found'}`);
+  }
+
+  return data.value;
+}
+
+async function callOpenAI(apiKey: string, fullPrompt: string) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4.1-2025-04-14',
+      messages: [
+        { 
+          role: 'system', 
+          content: 'You are an expert content creator specializing in cryptocurrency and financial marketing. Generate engaging, compliant content that resonates with the target audience. Always return valid JSON array format.'
+        },
+        { role: 'user', content: fullPrompt }
+      ],
+      temperature: 0.8,
+    }),
+  });
+
+  const data = await response.json();
+  console.log('OpenAI API response status:', response.status);
+  
+  if (!response.ok) {
+    throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
+  }
+
+  return data;
+}
+
+async function callPerplexity(apiKey: string, fullPrompt: string) {
+  const response = await fetch('https://api.perplexity.ai/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.1-sonar-large-128k-online',
+      messages: [
+        { 
+          role: 'system', 
+          content: 'You are an expert content creator specializing in cryptocurrency and financial marketing. Generate engaging, compliant content that resonates with the target audience. Always return valid JSON array format.'
+        },
+        { role: 'user', content: fullPrompt }
+      ],
+      temperature: 0.2,
+      top_p: 0.9,
+      max_tokens: 2000,
+      frequency_penalty: 1,
+      presence_penalty: 0
+    }),
+  });
+
+  const data = await response.json();
+  console.log('Perplexity API response status:', response.status);
+  
+  if (!response.ok) {
+    throw new Error(`Perplexity API error: ${data.error?.message || 'Unknown error'}`);
+  }
+
+  return data;
+}
+
+async function callAnthropic(apiKey: string, fullPrompt: string) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 2000,
+      messages: [
+        { 
+          role: 'user', 
+          content: `You are an expert content creator specializing in cryptocurrency and financial marketing. Generate engaging, compliant content that resonates with the target audience. Always return valid JSON array format.\n\n${fullPrompt}`
+        }
+      ],
+      temperature: 0.7,
+    }),
+  });
+
+  const data = await response.json();
+  console.log('Anthropic API response status:', response.status);
+  
+  if (!response.ok) {
+    throw new Error(`Anthropic API error: ${data.error?.message || 'Unknown error'}`);
+  }
+
+  // Convert Anthropic response format to OpenAI-like format
+  return {
+    choices: [{
+      message: {
+        content: data.content[0].text
+      }
+    }]
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -39,25 +155,8 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
-    // Get Perplexity API key from database
-    console.log('Fetching Perplexity API key from app_secrets table...');
-    const { data: secretData, error: secretError } = await supabaseClient
-      .from('app_secrets')
-      .select('value')
-      .eq('name', 'PERPLEXITY_API_KEY')
-      .single();
-
-    console.log('Secret query result:', { secretData, secretError });
-
-    if (secretError || !secretData?.value) {
-      console.error('Failed to get Perplexity API key:', secretError);
-      throw new Error(`Perplexity API key not configured. Error: ${secretError?.message || 'No value found'}`);
-    }
-
-    const perplexityApiKey = secretData.value;
-    console.log('Perplexity API Key status:', perplexityApiKey ? 'Found in database' : 'Not found');
-    console.log('API Key prefix:', perplexityApiKey ? perplexityApiKey.substring(0, 10) + '...' : 'N/A');
     const { 
+      aiProvider = 'perplexity',
       contentPrompt, 
       contentType, 
       targetAudience, 
@@ -67,6 +166,8 @@ serve(async (req) => {
       complianceGuidelines,
       callToAction
     } = await req.json();
+
+    console.log('Selected AI Provider:', aiProvider);
 
     const fullPrompt = `
 ${contentPrompt}
@@ -98,38 +199,32 @@ Return the response as a JSON array with 3 objects, each containing:
 - suggestedHashtags: array of relevant hashtags
 `;
 
-    const response = await fetch('https://api.perplexity.ai/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${perplexityApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.1-sonar-large-128k-online',
-        messages: [
-          { 
-            role: 'system', 
-            content: 'You are an expert content creator specializing in cryptocurrency and financial marketing. Generate engaging, compliant content that resonates with the target audience. Always return valid JSON array format.'
-          },
-          { role: 'user', content: fullPrompt }
-        ],
-        temperature: 0.2,
-        top_p: 0.9,
-        max_tokens: 2000,
-        frequency_penalty: 1,
-        presence_penalty: 0
-      }),
-    });
+    let data;
+    let apiKey;
 
-    const data = await response.json();
-    console.log('Perplexity API response:', data);
-    
-    if (!response.ok) {
-      throw new Error(`Perplexity API error: ${data.error?.message || 'Unknown error'}`);
+    // Route to the appropriate AI provider
+    switch (aiProvider) {
+      case 'openai':
+        apiKey = await getApiKey(supabaseClient, 'OPENAI_API_KEY');
+        data = await callOpenAI(apiKey, fullPrompt);
+        break;
+      
+      case 'perplexity':
+        apiKey = await getApiKey(supabaseClient, 'PERPLEXITY_API_KEY');
+        data = await callPerplexity(apiKey, fullPrompt);
+        break;
+      
+      case 'claude':
+        apiKey = await getApiKey(supabaseClient, 'ANTHROPIC_API_KEY');
+        data = await callAnthropic(apiKey, fullPrompt);
+        break;
+      
+      default:
+        throw new Error(`Unsupported AI provider: ${aiProvider}. Supported providers: openai, perplexity, claude`);
     }
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      throw new Error('Invalid response format from Perplexity API');
+      throw new Error(`Invalid response format from ${aiProvider} API`);
     }
 
     let generatedContent;
