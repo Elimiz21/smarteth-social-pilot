@@ -211,18 +211,33 @@ Return the response as a JSON array with 3 objects, each containing:
     // Route to the appropriate AI provider
     switch (aiProvider) {
       case 'openai':
-        apiKey = await getApiKey(supabaseClient, 'OPENAI_API_KEY');
-        data = await callOpenAI(apiKey, fullPrompt);
+        try {
+          apiKey = await getApiKey(supabaseClient, 'OPENAI_API_KEY');
+          data = await callOpenAI(apiKey, fullPrompt);
+        } catch (error) {
+          console.error('OpenAI error:', error);
+          throw new Error(`OpenAI unavailable: ${error.message}. Please try Perplexity instead.`);
+        }
         break;
       
       case 'perplexity':
-        apiKey = await getApiKey(supabaseClient, 'PERPLEXITY_API_KEY');
-        data = await callPerplexity(apiKey, fullPrompt);
+        try {
+          apiKey = await getApiKey(supabaseClient, 'PERPLEXITY_API_KEY');
+          data = await callPerplexity(apiKey, fullPrompt);
+        } catch (error) {
+          console.error('Perplexity error:', error);
+          throw new Error(`Perplexity API error: ${error.message}`);
+        }
         break;
       
       case 'claude':
-        apiKey = await getApiKey(supabaseClient, 'ANTHROPIC_API_KEY');
-        data = await callAnthropic(apiKey, fullPrompt);
+        try {
+          apiKey = await getApiKey(supabaseClient, 'ANTHROPIC_API_KEY');
+          data = await callAnthropic(apiKey, fullPrompt);
+        } catch (error) {
+          console.error('Claude error:', error);
+          throw new Error(`Claude unavailable: ${error.message}`);
+        }
         break;
       
       default:
