@@ -61,6 +61,12 @@ async function callOpenAI(apiKey: string, fullPrompt: string) {
 
 async function callPerplexity(apiKey: string, fullPrompt: string) {
   console.log('Calling Perplexity API...');
+  console.log('API Key length:', apiKey ? apiKey.length : 'undefined');
+  console.log('API Key starts with:', apiKey ? apiKey.substring(0, 10) + '...' : 'undefined');
+  
+  if (!apiKey) {
+    throw new Error('Perplexity API key is missing');
+  }
   
   const requestBody = {
     model: 'llama-3.1-sonar-small-128k-online',
@@ -82,26 +88,41 @@ async function callPerplexity(apiKey: string, fullPrompt: string) {
 
   console.log('Perplexity request body:', JSON.stringify(requestBody, null, 2));
 
-  const response = await fetch('https://api.perplexity.ai/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestBody),
-  });
+  try {
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
 
-  const data = await response.json();
-  console.log('Perplexity API response status:', response.status);
-  console.log('Perplexity API response data:', JSON.stringify(data, null, 2));
-  
-  if (!response.ok) {
-    const errorMsg = data.error?.message || data.message || data.detail || 'Unknown error';
-    console.error('Perplexity API error details:', data);
-    throw new Error(`Perplexity API error (${response.status}): ${errorMsg}`);
+    console.log('Perplexity API response status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Perplexity API error response:', errorText);
+      
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { message: errorText };
+      }
+      
+      const errorMsg = errorData.error?.message || errorData.message || errorData.detail || `HTTP ${response.status}: ${errorText}`;
+      throw new Error(`Perplexity API error (${response.status}): ${errorMsg}`);
+    }
+
+    const data = await response.json();
+    console.log('Perplexity API response data:', JSON.stringify(data, null, 2));
+    return data;
+    
+  } catch (error) {
+    console.error('Perplexity API call failed:', error);
+    throw error;
   }
-
-  return data;
 }
 
 async function callAnthropic(apiKey: string, fullPrompt: string) {
