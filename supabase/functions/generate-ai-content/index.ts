@@ -9,24 +9,37 @@ const corsHeaders = {
 
 async function getApiKey(supabaseClient: any, keyName: string) {
   console.log(`Attempting to fetch API key: ${keyName}`);
-  const { data, error } = await supabaseClient
-    .from('app_secrets')
-    .select('value')
-    .eq('name', keyName)
-    .maybeSingle();
 
-  if (error) {
-    console.error(`Database error getting ${keyName}:`, error);
-    throw new Error(`Database error fetching ${keyName}: ${error.message}`);
+  // First, attempt to read the key from the database table
+  let dbValue: string | null = null;
+  try {
+    const { data, error } = await supabaseClient
+      .from('app_secrets')
+      .select('value')
+      .eq('name', keyName)
+      .maybeSingle();
+    if (error) {
+      console.error(`Database error getting ${keyName}:`, error);
+      throw new Error(`Database error fetching ${keyName}: ${error.message}`);
+    }
+    dbValue = data?.value ?? null;
+  } catch (dbErr) {
+    console.warn(`Error querying app_secrets for ${keyName}:`, dbErr);
   }
 
-  if (!data?.value) {
-    console.error(`${keyName} not found or has no value`);
-    throw new Error(`${keyName} not configured. Please add this API key in your Supabase secrets.`);
+  // If not found in the DB, fall back to environment variables
+  if (!dbValue) {
+    const envValue = Deno.env.get(keyName);
+    if (envValue) {
+      console.log(`Using ${keyName} from environment variables`);
+      return envValue;
+    }
+    console.error(`${keyName} not found in database or environment`);
+    throw new Error(`${keyName} not configured. Please add this API key in your Supabase secrets or environment variables.`);
   }
 
-  console.log(`Successfully retrieved ${keyName}`);
-  return data.value;
+  console.log(`Successfully retrieved ${keyName} from database`);
+  return dbValue;
 }
 
 async function callOpenAI(apiKey: string, fullPrompt: string) {
@@ -242,40 +255,63 @@ Return the response as a JSON array with 3 objects, each containing:
     let data;
     let apiKey;
 
-    // Route to the appropriate AI provider
-    switch (aiProvider) {
-      case 'openai':
-        try {
-          apiKey = await getApiKey(supabaseClient, 'OPENAI_API_KEY');
-          data = await callOpenAI(apiKey, fullPrompt);
-        } catch (error) {
-          console.error('OpenAI error:', error);
-          throw new Error(`OpenAI unavailable: ${error.message}. Please try Perplexity instead.`);
+    /**
+     * Helper function to attempt a provider call. Returns the data if
+     * successful, otherwise returns undefined. This allows the main switch
+     * logic to implement provider fallbacks when an API key is missing or
+     * the call throws an error.
+     */
+    async function tryProvider(provider: string): Promise<any | undefined> {
+      try {
+        switch (provider) {
+          case 'openai': {
+            const key = await getApiKey(supabaseClient, 'OPENAI_API_KEY');
+            if (!key) return undefined;
+            return await callOpenAI(key, fullPrompt);
+          }
+          case 'perplexity': {
+            const key = await getApiKey(supabaseClient, 'PERPLEXITY_API_KEY');
+            if (!key) return undefined;
+            return await callPerplexity(key, fullPrompt);
+          }
+          case 'claude': {
+            const key = await getApiKey(supabaseClient, 'ANTHROPIC_API_KEY');
+            if (!key) return undefined;
+            return await callAnthropic(key, fullPrompt);
+          }
+          default:
+            return undefined;
         }
+      } catch (providerErr) {
+        console.error(`${provider} provider error:`, providerErr);
+        return undefined;
+      }
+    }
+
+    // Determine the order of providers to attempt. Always try the requested
+    // provider first, then fall back to OpenAI, Perplexity, Claude in that
+    // order. This ensures a best-effort attempt even if the preferred
+    // provider lacks a configured API key.
+    const providerOrder = [] as string[];
+    if (['openai', 'perplexity', 'claude'].includes(aiProvider)) {
+      providerOrder.push(aiProvider);
+    }
+    // Append fallback providers, ensuring no duplicates
+    ['openai', 'perplexity', 'claude'].forEach((p) => {
+      if (!providerOrder.includes(p)) providerOrder.push(p);
+    });
+
+    // Iterate through providers until one succeeds
+    for (const provider of providerOrder) {
+      const result = await tryProvider(provider);
+      if (result) {
+        data = result;
         break;
-      
-      case 'perplexity':
-        try {
-          apiKey = await getApiKey(supabaseClient, 'PERPLEXITY_API_KEY');
-          data = await callPerplexity(apiKey, fullPrompt);
-        } catch (error) {
-          console.error('Perplexity error:', error);
-          throw new Error(`Perplexity API error: ${error.message}`);
-        }
-        break;
-      
-      case 'claude':
-        try {
-          apiKey = await getApiKey(supabaseClient, 'ANTHROPIC_API_KEY');
-          data = await callAnthropic(apiKey, fullPrompt);
-        } catch (error) {
-          console.error('Claude error:', error);
-          throw new Error(`Claude unavailable: ${error.message}`);
-        }
-        break;
-      
-      default:
-        throw new Error(`Unsupported AI provider: ${aiProvider}. Supported providers: openai, perplexity, claude`);
+      }
+    }
+
+    if (!data) {
+      throw new Error('No available AI providers are configured. Please configure at least one API key.');
     }
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
