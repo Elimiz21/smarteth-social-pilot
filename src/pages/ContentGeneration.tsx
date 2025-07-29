@@ -63,7 +63,7 @@ export default function ContentGeneration() {
   const [generatedContents, setGeneratedContents] = useState<GeneratedContent[]>([
     {
       id: "1",
-      content: "🚀 SmartEth's regulated approach to ETH asset management continues to deliver exceptional results for institutional clients. Our cutting-edge DeFi integration provides the security and transparency modern investors demand. #SmartETH #InstitutionalCrypto #DeFi",
+      content: "üöÄ SmartEth's regulated approach to ETH asset management continues to deliver exceptional results for institutional clients. Our cutting-edge DeFi integration provides the security and transparency modern investors demand. #SmartETH #InstitutionalCrypto #DeFi",
       type: "tweet",
       audience: "investors",
       tone: "professional",
@@ -268,9 +268,22 @@ Please create content that aligns with this strategy and resonates with our targ
               AI Settings
             </Button>
           </AISettingsDialog>
-          <Button variant="hero">
-            <Sparkles className="w-4 h-4 mr-2" />
-            Generate Content
+          <Button
+            variant="hero"
+            onClick={handleGenerateContent}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate Content
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -573,7 +586,12 @@ Please create content that aligns with this strategy and resonates with our targ
                       </Select>
                     </div>
                   </div>
-                  <Button variant="accent" className="w-full">
+                  <Button
+                    variant="accent"
+                    className="w-full"
+                    disabled
+                    title="Visual content generation coming soon"
+                  >
                     <Image className="w-4 h-4 mr-2" />
                     Generate Visual Content
                   </Button>
