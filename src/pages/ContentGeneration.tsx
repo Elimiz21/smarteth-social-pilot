@@ -48,7 +48,10 @@ export default function ContentGeneration() {
   const { user } = useAuth();
   const [strategies, setStrategies] = useState<any[]>([]);
   const [activeStrategy, setActiveStrategy] = useState<any>(null);
-  const [selectedAiProvider, setSelectedAiProvider] = useState("perplexity");
+  // Default to OpenAI as the initial provider. Using Perplexity as the default
+  // caused issues when a Perplexity API key wasn't configured. Selecting
+  // OpenAI improves the likelihood that an available API key exists.
+  const [selectedAiProvider, setSelectedAiProvider] = useState("openai");
   const [availableProviders, setAvailableProviders] = useState(defaultAiProviders);
   const [contentPrompt, setContentPrompt] = useState("");
   const [selectedContentType, setSelectedContentType] = useState("tweet");
@@ -114,15 +117,25 @@ export default function ContentGeneration() {
       try {
         const { data, error } = await supabase.functions.invoke('check-ai-providers');
         if (error) throw error;
-        
-        if (data.availableProviders && data.availableProviders.length > 0) {
+
+        if (data && data.availableProviders && data.availableProviders.length > 0) {
           setAvailableProviders(data.availableProviders);
-          // Set default to first available provider
-          setSelectedAiProvider(data.availableProviders[0].id);
+          // Prefer a recommended provider if available; fall back to the first
+          const recommended = data.availableProviders.find((p: any) => p.recommended);
+          const providerToUse = recommended?.id ?? data.availableProviders[0].id;
+          setSelectedAiProvider(providerToUse);
+        } else {
+          // No providers returned; fall back to defaults and choose a recommended default
+          setAvailableProviders(defaultAiProviders);
+          const recommendedDefault = defaultAiProviders.find(p => p.recommended);
+          setSelectedAiProvider(recommendedDefault?.id ?? defaultAiProviders[0].id);
         }
       } catch (error) {
         console.error('Error fetching available providers:', error);
-        // Keep using default providers if the check fails
+        // On error, revert to default providers and pick a sensible default
+        setAvailableProviders(defaultAiProviders);
+        const recommendedDefault = defaultAiProviders.find(p => p.recommended);
+        setSelectedAiProvider(recommendedDefault?.id ?? defaultAiProviders[0].id);
       }
     };
 
