@@ -232,6 +232,13 @@ Please create content that aligns with this strategy and resonates with our targ
   };
 
   const handleGenerateContent = async () => {
+    // Require an authenticated user before generating content. Without a session
+    // Supabase will refuse the function call (missing JWT), so we short-circuit
+    // and prompt the user to log in.
+    if (!user) {
+      alert('Please sign in to generate content.');
+      return;
+    }
     setIsGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-ai-content', {
