@@ -341,8 +341,11 @@ Return the response as a JSON array with 3 objects, each containing:
     });
   } catch (error) {
     console.error('Error in generate-ai-content function:', error);
+    // Always return a 200 so that the Supabase JS client treats this as a
+    // successful response. The error message will be included in the body
+    // under the `error` property and can be handled on the client.
     return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
