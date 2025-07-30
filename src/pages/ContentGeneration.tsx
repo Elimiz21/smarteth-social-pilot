@@ -255,7 +255,13 @@ Please create content that aligns with this strategy and resonates with our targ
         }
       });
 
+      // Supabase treats any non-2xx status as an error. The edge function now
+      // returns a 200 status even for errors and includes the error message
+      // under the `error` property. Check both error fields.
       if (error) throw error;
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
       console.log('Generated content response:', data);
       setGeneratedVersions(data.generatedContent || []);
