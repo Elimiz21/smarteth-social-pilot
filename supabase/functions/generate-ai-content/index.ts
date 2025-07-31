@@ -208,8 +208,9 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
-    const { 
+    const {
       aiProvider = 'perplexity',
+      apiKeys = {},
       contentPrompt, 
       contentType, 
       targetAudience, 
@@ -263,19 +264,30 @@ Return the response as a JSON array with 3 objects, each containing:
      */
     async function tryProvider(provider: string): Promise<any | undefined> {
       try {
+        let overrideKey: string | undefined;
+        // Check if the client provided an override API key for this provider
+        if (apiKeys) {
+          if (provider === 'openai' && apiKeys.OPENAI_API_KEY) {
+            overrideKey = apiKeys.OPENAI_API_KEY;
+          } else if (provider === 'perplexity' && apiKeys.PERPLEXITY_API_KEY) {
+            overrideKey = apiKeys.PERPLEXITY_API_KEY;
+          } else if (provider === 'claude' && apiKeys.ANTHROPIC_API_KEY) {
+            overrideKey = apiKeys.ANTHROPIC_API_KEY;
+          }
+        }
         switch (provider) {
           case 'openai': {
-            const key = await getApiKey(supabaseClient, 'OPENAI_API_KEY');
+            const key = overrideKey ?? await getApiKey(supabaseClient, 'OPENAI_API_KEY');
             if (!key) return undefined;
             return await callOpenAI(key, fullPrompt);
           }
           case 'perplexity': {
-            const key = await getApiKey(supabaseClient, 'PERPLEXITY_API_KEY');
+            const key = overrideKey ?? await getApiKey(supabaseClient, 'PERPLEXITY_API_KEY');
             if (!key) return undefined;
             return await callPerplexity(key, fullPrompt);
           }
           case 'claude': {
-            const key = await getApiKey(supabaseClient, 'ANTHROPIC_API_KEY');
+            const key = overrideKey ?? await getApiKey(supabaseClient, 'ANTHROPIC_API_KEY');
             if (!key) return undefined;
             return await callAnthropic(key, fullPrompt);
           }
@@ -311,7 +323,25 @@ Return the response as a JSON array with 3 objects, each containing:
     }
 
     if (!data) {
-      throw new Error('No available AI providers are configured. Please configure at least one API key.');
+      // No providers are configured or all provider calls failed. Instead of
+      // returning an error, generate simple placeholder content so the user
+      // still receives a response. This avoids the function returning a non
+      // 2xx status and guides the user to configure their API keys.
+      console.warn('No AI providers configured; generating placeholder content.');
+      const placeholderTexts = [
+        `We're unable to generate AI content right now. Please ensure your AI provider keys are configured. Meanwhile, here is a summary of your prompt:\n\n${contentPrompt}`,
+        `AI content generation is temporarily unavailable. Configure your API keys to enable this feature. Your original prompt was:\n\n${contentPrompt}`,
+        `No AI provider is available. Once you set up an API key, you'll get tailored content here. Prompt:\n\n${contentPrompt}`
+      ];
+      const fallbackContent = placeholderTexts.map((text) => ({
+        content: text,
+        engagementScore: 5,
+        characterCount: text.length,
+        suggestedHashtags: ['#SmartETH', '#AIContent', '#ConfigureAPI']
+      }));
+      return new Response(JSON.stringify({ generatedContent: fallbackContent }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
