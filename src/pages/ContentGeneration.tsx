@@ -241,6 +241,18 @@ Please create content that aligns with this strategy and resonates with our targ
     }
     setIsGenerating(true);
     try {
+      // Collect any API keys stored in localStorage. These keys are optional
+      // overrides that allow the client to provide API credentials directly
+      // when the edge function cannot access Supabase secrets. The keys are
+      // expected to be stored via the CredentialsDialog component.
+      let apiKeys: Record<string, string> = {};
+      if (typeof window !== 'undefined') {
+        ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'PERPLEXITY_API_KEY'].forEach((name) => {
+          const val = localStorage.getItem(name);
+          if (val) apiKeys[name] = val;
+        });
+      }
+
       const { data, error } = await supabase.functions.invoke('generate-ai-content', {
         body: {
           aiProvider: selectedAiProvider,
@@ -251,7 +263,8 @@ Please create content that aligns with this strategy and resonates with our targ
           keywords,
           specificRequirements,
           complianceGuidelines,
-          callToAction
+          callToAction,
+          apiKeys
         }
       });
 
