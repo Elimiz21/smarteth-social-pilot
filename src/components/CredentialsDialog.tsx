@@ -1,187 +1,667 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ContentLibrary, type GeneratedContent } from "@/components/content/ContentLibrary";
+import { WeeklyContentPlanner, type WeeklyContentPlan } from "@/components/content/WeeklyContentPlanner";
+import { AISettingsDialog } from "@/components/content/AISettingsDialog";
 import { supabase } from "@/integrations/supabase/client";
-import { Settings, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { 
+  Sparkles, 
+  RefreshCw, 
+  Copy, 
+  Edit, 
+  Save, 
+  Wand2,
+  MessageSquare,
+  Image,
+  BarChart3,
+  Settings,
+  Calendar,
+  Library,
+  Brain
+} from "lucide-react";
 
-interface CredentialField {
-  name: string;
-  label: string;
-  placeholder: string;
-  isSecret?: boolean;
-}
+const defaultAiProviders = [
+  { id: "openai", name: "OpenAI GPT-4", recommended: true },
+  { id: "claude", name: "Anthropic Claude", recommended: true },
+  { id: "gemini", name: "Google Gemini" },
+  { id: "meta", name: "Meta AI" },
+  { id: "perplexity", name: "Perplexity AI" }
+];
 
-interface CredentialsDialogProps {
-  platformName: string;
-  fields: CredentialField[];
-  triggerLabel?: string;
-}
+const contentTypes = [
+  { id: "tweet", name: "X/Twitter Post", platforms: ["Twitter"] },
+  { id: "linkedin", name: "LinkedIn Article", platforms: ["LinkedIn"] },
+  { id: "instagram", name: "Instagram Post", platforms: ["Instagram"] },
+  { id: "thread", name: "Twitter Thread", platforms: ["Twitter"] },
+  { id: "announcement", name: "Multi-Platform Announcement", platforms: ["All"] }
+];
 
-export const CredentialsDialog = ({ platformName, fields, triggerLabel = "Edit Credentials" }: CredentialsDialogProps) => {
-  const [credentials, setCredentials] = useState<Record<string, string>>({});
-  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
-  const { toast } = useToast();
+export default function ContentGeneration() {
+  const { user } = useAuth();
+  const [strategies, setStrategies] = useState<any[]>([]);
+  const [activeStrategy, setActiveStrategy] = useState<any>(null);
+  // Default to OpenAI as the initial provider. Using Perplexity as the default
+  // caused issues when a Perplexity API key wasn't configured. Selecting
+  // OpenAI improves the likelihood that an available API key exists.
+  const [selectedAiProvider, setSelectedAiProvider] = useState("openai");
+  const [availableProviders, setAvailableProviders] = useState(defaultAiProviders);
+  const [contentPrompt, setContentPrompt] = useState("");
+  const [selectedContentType, setSelectedContentType] = useState("tweet");
+  const [selectedAudience, setSelectedAudience] = useState("");
+  const [selectedTone, setSelectedTone] = useState("professional");
+  const [keywords, setKeywords] = useState("");
+  const [specificRequirements, setSpecificRequirements] = useState("");
+  const [complianceGuidelines, setComplianceGuidelines] = useState("");
+  const [callToAction, setCallToAction] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedVersions, setGeneratedVersions] = useState<any[]>([]);
+  const [generatedContents, setGeneratedContents] = useState<GeneratedContent[]>([
+    {
+      id: "1",
+      content: "üöÄ SmartEth's regulated approach to ETH asset management continues to deliver exceptional results for institutional clients. Our cutting-edge DeFi integration provides the security and transparency modern investors demand. #SmartETH #InstitutionalCrypto #DeFi",
+      type: "tweet",
+      audience: "investors",
+      tone: "professional",
+      platforms: ["twitter", "linkedin"],
+      keywords: ["SmartETH", "DeFi", "institutional"],
+      engagementScore: 8.5,
+      createdAt: new Date(Date.now() - 86400000),
+      status: "approved",
+    },
+    {
+      id: "2", 
+      content: "The future of crypto asset management lies in regulation and innovation working together. SmartEth's Israeli regulatory framework provides the foundation for sustainable growth in the digital asset space.",
+      type: "linkedin",
+      audience: "investors",
+      tone: "authoritative", 
+      platforms: ["linkedin"],
+      keywords: ["regulation", "innovation", "digital assets"],
+      engagementScore: 9.2,
+      createdAt: new Date(Date.now() - 172800000),
+      status: "approved",
+    },
+  ]);
 
-  const handleInputChange = (field: string, value: string) => {
-    setCredentials(prev => ({ ...prev, [field]: value }));
+  const [weeklyPlans, setWeeklyPlans] = useState<WeeklyContentPlan[]>([]);
+
+  useEffect(() => {
+    const fetchStrategies = async () => {
+      if (!user?.id) return;
+      
+      const { data } = await supabase
+        .from('strategies')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (data) {
+        setStrategies(data);
+        const active = data.find(s => s.is_active) || data[0];
+        setActiveStrategy(active);
+        setContentPrompt(buildStrategyPrompt(active));
+        if (active?.target_audience) {
+          setSelectedAudience(active.target_audience.split(',')[0]?.trim().toLowerCase() || "");
+        }
+      }
+    };
+
+    const fetchAvailableProviders = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('check-ai-providers');
+        if (error) throw error;
+
+        if (data && data.availableProviders && data.availableProviders.length > 0) {
+          setAvailableProviders(data.availableProviders);
+          // Prefer a recommended provider if available; fall back to the first
+          const recommended = data.availableProviders.find((p: any) => p.recommended);
+          const providerToUse = recommended?.id ?? data.availableProviders[0].id;
+          setSelectedAiProvider(providerToUse);
+        } else {
+          // No providers returned; fall back to defaults and choose a recommended default
+          setAvailableProviders(defaultAiProviders);
+          const recommendedDefault = defaultAiProviders.find(p => p.recommended);
+          setSelectedAiProvider(recommendedDefault?.id ?? defaultAiProviders[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching available providers:', error);
+        // On error, revert to default providers and pick a sensible default
+        setAvailableProviders(defaultAiProviders);
+        const recommendedDefault = defaultAiProviders.find(p => p.recommended);
+        setSelectedAiProvider(recommendedDefault?.id ?? defaultAiProviders[0].id);
+      }
+    };
+
+    fetchStrategies();
+    fetchAvailableProviders();
+  }, [user?.id]);
+
+  const buildStrategyPrompt = (strategy = activeStrategy) => {
+    if (!strategy) return "";
+    
+    return `
+Context: You are creating content for ${strategy.name || 'our marketing strategy'}.
+
+Strategy Overview:
+Strategy Overview:
+${strategy.description || ''}
+
+Target Audience: ${strategy.target_audience || ''}
+
+Key Messaging: ${strategy.key_messaging || ''}
+
+Content Themes: ${strategy.content_themes || ''}
+
+Objectives: ${strategy.objectives?.map((obj: any) => `- ${obj.text}`).join('\n') || ''}
+
+Please create content that aligns with this strategy and resonates with our target audience.
+    `.trim();
   };
 
-  const toggleSecretVisibility = (field: string) => {
-    setShowSecrets(prev => ({ ...prev, [field]: !prev[field] }));
+  const handleCreatePlan = (plan: Omit<WeeklyContentPlan, 'id'>) => {
+    const newPlan = { ...plan, id: Date.now().toString() };
+    setWeeklyPlans(prev => [...prev, newPlan]);
   };
 
-  const handleUpdateCredentials = async () => {
-    // Check if all required fields are filled
-    const missingFields = fields.filter(field => !credentials[field.name] || credentials[field.name].trim() === "");
-    if (missingFields.length > 0) {
-      toast({
-        title: "Missing Credentials",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
+  const handleExecutePlan = (planId: string) => {
+    // This would open the bulk scheduler - not used directly anymore
+    console.log("Executing plan:", planId);
+  };
+
+  const handleScheduleBulkItems = (items: any[]) => {
+    console.log("Scheduling bulk items:", items);
+    // Here you would integrate with the scheduling system
+    // For now, we'll add the generated content to the library
+    const newContents = items.map(item => ({
+      ...item.content,
+      status: "approved" as const
+    }));
+    setGeneratedContents(prev => [...prev, ...newContents]);
+  };
+
+  const handleEditPlan = (plan: WeeklyContentPlan) => {
+    console.log("Edit plan:", plan);
+  };
+
+  const handleSelectContent = (content: GeneratedContent) => {
+    console.log("Selected content:", content);
+  };
+
+  const handleEditContent = (content: GeneratedContent) => {
+    console.log("Edit content:", content);
+  };
+
+  const handleDeleteContent = (id: string) => {
+    setGeneratedContents(prev => prev.filter(c => c.id !== id));
+  };
+
+  const handleApproveContent = (id: string) => {
+    setGeneratedContents(prev => 
+      prev.map(c => c.id === id ? { ...c, status: "approved" as const } : c)
+    );
+  };
+
+  const handleApproveGenerated = (index: number) => {
+    const version = generatedVersions[index];
+    if (!version) return;
+
+    const newContent: GeneratedContent = {
+      id: Date.now().toString() + index,
+      content: version.content,
+      type: selectedContentType as any,
+      audience: selectedAudience,
+      tone: selectedTone,
+      platforms: contentTypes.find(t => t.id === selectedContentType)?.platforms || [],
+      keywords: keywords.split(',').map(k => k.trim()).filter(Boolean),
+      engagementScore: version.engagementScore || 8.5,
+      createdAt: new Date(),
+      status: "approved"
+    };
+
+    setGeneratedContents(prev => [...prev, newContent]);
+    
+    // Remove from generated versions after approval
+    setGeneratedVersions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleGenerateContent = async () => {
+    // Require an authenticated user before generating content. Without a session
+    // Supabase will refuse the function call (missing JWT), so we short-circuit
+    // and prompt the user to log in.
+    if (!user) {
+      alert('Please sign in to generate content.');
       return;
     }
-
-    // Validate OpenAI API key format
-    if (platformName.toLowerCase() === 'openai' && credentials.OPENAI_API_KEY) {
-      const apiKey = credentials.OPENAI_API_KEY.trim();
-      if (!apiKey.startsWith('sk-') || apiKey.length < 48) {
-        toast({
-          title: "Invalid API Key Format",
-          description: "OpenAI API keys should start with 'sk-' and be at least 48 characters long. Please check your API key.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
-    setIsUpdating(true);
+    setIsGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('update-app-secrets', {
+      // Collect any API keys stored in localStorage. These keys are optional
+      // overrides that allow the client to provide API credentials directly
+      // when the edge function cannot access Supabase secrets. The keys are
+      // expected to be stored via the CredentialsDialog component.
+      let apiKeys: Record<string, string> = {};
+      if (typeof window !== 'undefined') {
+        ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'PERPLEXITY_API_KEY'].forEach((name) => {
+          const val = localStorage.getItem(name);
+          if (val) apiKeys[name] = val;
+        });
+      }
+
+      const { data, error } = await supabase.functions.invoke('generate-ai-content', {
         body: {
-          platform: platformName.toLowerCase(),
-          secrets: credentials
+          aiProvider: selectedAiProvider,
+          contentPrompt,
+          contentType: selectedContentType,
+          targetAudience: selectedAudience,
+          tone: selectedTone,
+          keywords,
+          specificRequirements,
+          complianceGuidelines,
+          callToAction,
+          apiKeys
         }
       });
 
-      if (error) {
-        console.error(`Error updating ${platformName} credentials:`, error);
-        toast({
-          title: "Update Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else if (data?.success) {
-        toast({
-          title: "Credentials Updated!",
-          description: `${platformName} credentials have been successfully updated in the system.`,
-        });
-        
-        setIsOpen(false);
-        // Clear form for security
-        setCredentials({});
-      } else {
-        toast({
-          title: "Update Failed",
-          description: data?.error || "Unknown error occurred",
-          variant: "destructive",
-        });
+      // Supabase treats any non-2xx status as an error. The edge function now
+      // returns a 200 status even for errors and includes the error message
+      // under the `error` property. Check both error fields.
+      if (error) throw error;
+      if (data?.error) {
+        throw new Error(data.error);
       }
-    } catch (err: any) {
-      console.error('Error:', err);
-      toast({
-        title: "Update Error",
-        description: err.message || "An unexpected error occurred",
-        variant: "destructive",
-      });
+
+      console.log('Generated content response:', data);
+      setGeneratedVersions(data.generatedContent || []);
+    } catch (error) {
+      console.error('Error generating content:', error);
+      // Show error message to user
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate content';
+      alert(`Error generating content: ${errorMessage}`);
     } finally {
-      setIsUpdating(false);
+      setIsGenerating(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Settings className="w-4 h-4 mr-2" />
-          {triggerLabel}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Update {platformName} Credentials</DialogTitle>
-          <DialogDescription>
-            Enter your {platformName} API credentials to enable system-wide integration.
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-4">
-          {fields.map((field) => (
-            <div key={field.name} className="space-y-2">
-              <Label htmlFor={field.name}>{field.label}</Label>
-              {field.isSecret ? (
-                <div className="relative">
-                  <Input
-                    id={field.name}
-                    type={showSecrets[field.name] ? "text" : "password"}
-                    value={credentials[field.name] || ""}
-                    onChange={(e) => handleInputChange(field.name, e.target.value)}
-                    placeholder={field.placeholder}
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => toggleSecretVisibility(field.name)}
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+            AI Content Generation
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Create engaging content for SmartEth marketing campaigns
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <AISettingsDialog>
+            <Button variant="outline">
+              <Settings className="w-4 h-4 mr-2" />
+              AI Settings
+            </Button>
+          </AISettingsDialog>
+          <Button
+            variant="hero"
+            onClick={handleGenerateContent}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate Content
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      <Tabs defaultValue="generator" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="generator" className="flex items-center gap-2">
+            <Brain className="w-4 h-4" />
+            AI Generator
+          </TabsTrigger>
+          <TabsTrigger value="library" className="flex items-center gap-2">
+            <Library className="w-4 h-4" />
+            Content Library
+          </TabsTrigger>
+          <TabsTrigger value="planner" className="flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            Weekly Planner
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="generator">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Content Configuration */}
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wand2 className="w-5 h-5" />
+              Content Settings
+            </CardTitle>
+            <CardDescription>
+              Configure your content generation parameters
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* AI Provider */}
+            <div className="space-y-2">
+              <Label>AI Provider</Label>
+              <Select value={selectedAiProvider} onValueChange={setSelectedAiProvider}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableProviders.map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      <div className="flex items-center gap-2">
+                        {provider.name}
+                        {provider.recommended && (
+                          <Badge variant="secondary" className="text-xs">Recommended</Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Content Type */}
+            <div className="space-y-2">
+              <Label>Content Type</Label>
+              <Select value={selectedContentType} onValueChange={setSelectedContentType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {contentTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Target Audience */}
+            <div className="space-y-2">
+              <Label>Target Audience</Label>
+              <Select value={selectedAudience} onValueChange={setSelectedAudience}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeStrategy?.target_audience ? (
+                    activeStrategy.target_audience.split(',').map((audience: string, index: number) => (
+                      <SelectItem key={index} value={audience.trim().toLowerCase()}>
+                        {audience.trim()}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="investors">Institutional Investors</SelectItem>
+                      <SelectItem value="retail">Retail Crypto Holders</SelectItem>
+                      <SelectItem value="traders">Professional Traders</SelectItem>
+                      <SelectItem value="general">General Public</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Tone */}
+            <div className="space-y-2">
+              <Label>Tone & Style</Label>
+              <Select value={selectedTone} onValueChange={setSelectedTone}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="professional">Professional</SelectItem>
+                  <SelectItem value="conversational">Conversational</SelectItem>
+                  <SelectItem value="authoritative">Authoritative</SelectItem>
+                  <SelectItem value="educational">Educational</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Topic/Keywords */}
+            <div className="space-y-2">
+              <Label>Keywords/Topics</Label>
+              <Input 
+                placeholder="SmartEth, DeFi, Asset Management..." 
+                value={keywords}
+                onChange={(e) => setKeywords(e.target.value)}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Content Generation Area */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" />
+              Content Prompt Builder
+            </CardTitle>
+            <CardDescription>
+              Craft detailed prompts for AI content generation
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="prompt" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="prompt">Prompt Builder</TabsTrigger>
+                <TabsTrigger value="generated">Generated Content</TabsTrigger>
+                <TabsTrigger value="visual">Visual Content</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="prompt" className="space-y-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Content Role/Context</Label>
+                      <Textarea 
+                        placeholder="You are an expert crypto marketing strategist for SmartEth, a regulated Israeli asset management firm raising $50M for innovative ETH strategies..."
+                        value={contentPrompt}
+                        onChange={(e) => setContentPrompt(e.target.value)}
+                        className="min-h-[120px]"
+                      />
+                    </div>
+                  <div className="space-y-2">
+                    <Label>Specific Requirements</Label>
+                    <Textarea 
+                      placeholder="Create content that emphasizes regulatory compliance, institutional credibility, innovative technology, proven track record..."
+                      value={specificRequirements}
+                      onChange={(e) => setSpecificRequirements(e.target.value)}
+                      className="min-h-[120px]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Compliance Guidelines</Label>
+                    <Textarea 
+                      placeholder="Include required disclaimers, avoid promotional language, focus on factual information, emphasize risk disclosures..."
+                      value={complianceGuidelines}
+                      onChange={(e) => setComplianceGuidelines(e.target.value)}
+                      className="min-h-[120px]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Call-to-Action</Label>
+                    <Input 
+                      placeholder="Learn more at smarteth.com | Contact for institutional inquiries" 
+                      value={callToAction}
+                      onChange={(e) => setCallToAction(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button 
+                    variant="hero" 
+                    className="flex-1" 
+                    onClick={handleGenerateContent}
+                    disabled={isGenerating}
                   >
-                    {showSecrets[field.name] ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    {isGenerating ? "Generating..." : "Generate 3 Versions"}
+                  </Button>
+                  <Button variant="outline">
+                    <RefreshCw className="w-4 h-4" />
                   </Button>
                 </div>
-              ) : (
-                <Input
-                  id={field.name}
-                  type="text"
-                  value={credentials[field.name] || ""}
-                  onChange={(e) => handleInputChange(field.name, e.target.value)}
-                  placeholder={field.placeholder}
-                />
-              )}
-            </div>
-          ))}
-          
-          <div className="text-sm text-muted-foreground">
-            <p>Make sure you have the required permissions for the {platformName} API.</p>
-          </div>
-        </div>
+              </TabsContent>
 
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setIsOpen(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={handleUpdateCredentials}
-            disabled={isUpdating}
-          >
-            {isUpdating ? "Updating..." : "Update Credentials"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              <TabsContent value="generated" className="space-y-4">
+                <div className="space-y-4">
+                  {generatedVersions.length > 0 ? (
+                    generatedVersions.map((version, index) => (
+                      <Card key={index} className="border border-accent/20">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-base">Version {index + 1}</CardTitle>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                <BarChart3 className="w-3 h-3 mr-1" />
+                                Engagement: {version.engagementScore || 8.5}/10
+                              </Badge>
+                              <Button variant="ghost" size="icon-sm">
+                                <Copy className="w-3 h-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon-sm">
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                            {version.content}
+                          </p>
+                          {version.suggestedHashtags && (
+                            <div className="mt-3 flex flex-wrap gap-1">
+                              {version.suggestedHashtags.map((tag: string, tagIndex: number) => (
+                                <Badge key={tagIndex} variant="secondary" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center mt-4 pt-3 border-t">
+                            <div className="text-xs text-muted-foreground">
+                              Character count: {version.characterCount || version.content?.length || 0} | Estimated reach: 2.5K
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline">Edit</Button>
+                              <Button 
+                                size="sm" 
+                                variant="default"
+                                onClick={() => handleApproveGenerated(index)}
+                              >
+                                Approve
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>Generate content to see results here</p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="visual" className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Visual Content Prompt</Label>
+                    <Textarea 
+                      placeholder="Create a professional financial chart showing ETH performance, modern corporate design, SmartEth branding..."
+                      className="min-h-[120px]"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Image Style</Label>
+                      <Select defaultValue="professional">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="professional">Professional</SelectItem>
+                          <SelectItem value="modern">Modern Tech</SelectItem>
+                          <SelectItem value="corporate">Corporate</SelectItem>
+                          <SelectItem value="infographic">Infographic</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Dimensions</Label>
+                      <Select defaultValue="square">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="square">Square (1:1)</SelectItem>
+                          <SelectItem value="landscape">Landscape (16:9)</SelectItem>
+                          <SelectItem value="portrait">Portrait (9:16)</SelectItem>
+                          <SelectItem value="twitter">Twitter Card (2:1)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <Button
+                    variant="accent"
+                    className="w-full"
+                    disabled
+                    title="Visual content generation coming soon"
+                  >
+                    <Image className="w-4 h-4 mr-2" />
+                    Generate Visual Content
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="library">
+          <ContentLibrary 
+            contents={generatedContents}
+            onSelectContent={handleSelectContent}
+            onEditContent={handleEditContent}
+            onDeleteContent={handleDeleteContent}
+            onApproveContent={handleApproveContent}
+          />
+        </TabsContent>
+
+        <TabsContent value="planner">
+          <WeeklyContentPlanner 
+            plans={weeklyPlans}
+            onCreatePlan={handleCreatePlan}
+            onExecutePlan={handleExecutePlan}
+            onEditPlan={handleEditPlan}
+            onScheduleBulkItems={handleScheduleBulkItems}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
-};
+}
